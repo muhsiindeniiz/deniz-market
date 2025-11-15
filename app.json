@@ -9,9 +9,17 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.deniz.market",
+      "buildConfiguration": "Release",
+      "autoIncrement": true,
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
+      "buildType": "app-bundle",
+      "autoIncrement": true,
+      "package": "com.koordinat.coffee",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -22,6 +30,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
+      "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },

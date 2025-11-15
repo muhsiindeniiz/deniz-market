@@ -1,98 +1,220 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, FlatList, Dimensions, RefreshControl } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '@/lib/supabase';
+import { useAuthStore } from '@/store/authStore';
+import { useCartStore } from '@/store/cartStore';
+import { Product, Category } from '@/lib/types';
+import { COLORS } from '@/lib/constants';
+import ProductCard from '@/components/home/ProductCard';
+import CategoryCard from '@/components/home/CategoryCard';
+import PromoCarousel from '@/components/home/PromoCarousel';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    const router = useRouter();
+    const { user } = useAuthStore();
+    const itemCount = useCartStore((state) => state.getItemCount());
+    const [selectedAddress, setSelectedAddress] = useState('Adres Seçin');
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+    const [bestSellingProducts, setBestSellingProducts] = useState<Product[]>([]);
+    const [refreshing, setRefreshing] = useState(false);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
-  );
+    useEffect(() => {
+        loadData();
+        loadDefaultAddress();
+    }, []);
+
+    const loadData = async () => {
+        try {
+            // Kategorileri yükle
+            const { data: categoriesData } = await supabase
+                .from('categories')
+                .select('*')
+                .limit(6);
+
+            if (categoriesData) setCategories(categoriesData);
+
+            // Öne çıkan ürünleri yükle
+            const { data: featuredData } = await supabase
+                .from('products')
+                .select('*, category:categories(*)')
+                .eq('is_featured', true)
+                .limit(10);
+
+            if (featuredData) setFeaturedProducts(featuredData);
+
+            // Çok satan ürünleri yükle
+            const { data: bestSellingData } = await supabase
+                .from('products')
+                .select('*, category:categories(*)')
+                .order('created_at', { ascending: false })
+                .limit(10);
+
+            if (bestSellingData) setBestSellingProducts(bestSellingData);
+        } catch (error) {
+            console.error('Error loading data:', error);
+        }
+    };
+
+    const loadDefaultAddress = async () => {
+        if (!user) return;
+
+        try {
+            const { data } = await supabase
+                .from('addresses')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('is_default', true)
+                .single();
+
+            if (data) {
+                setSelectedAddress(`${data.district}, ${data.city}`);
+            }
+        } catch (error) {
+            console.error('Error loading address:', error);
+        }
+    };
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await loadData();
+        setRefreshing(false);
+    };
+
+    return (
+        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+            {/* Header */}
+            <View className="bg-white px-4 py-3 flex-row items-center justify-between border-b border-gray-200">
+                <TouchableOpacity
+                    onPress={() => router.push('/addresses')}
+                    className="flex-1 flex-row items-center"
+                >
+                    <Ionicons name="location" size={20} color={COLORS.primary} />
+                    <View className="flex-1 ml-2">
+                        <Text className="text-xs" style={{ color: COLORS.gray }}>
+                            Teslimat Adresi
+                        </Text>
+                        <Text className="text-sm font-semibold" style={{ color: COLORS.dark }} numberOfLines={1}>
+                            {selectedAddress}
+                        </Text>
+                    </View>
+                    <Ionicons name="chevron-down" size={20} color={COLORS.dark} />
+                </TouchableOpacity>
+
+                <View className="flex-row ml-4">
+                    <TouchableOpacity
+                        onPress={() => router.push('/notifications')}
+                        className="w-10 h-10 rounded-full items-center justify-center mr-2"
+                        style={{ backgroundColor: COLORS.background }}
+                    >
+                        <Ionicons name="notifications-outline" size={24} color={COLORS.dark} />
+                        <View className="absolute top-1 right-1 w-2 h-2 rounded-full" style={{ backgroundColor: COLORS.danger }} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => router.push('/cart')}
+                        className="w-10 h-10 rounded-full items-center justify-center"
+                        style={{ backgroundColor: COLORS.background }}
+                    >
+                        <Ionicons name="cart-outline" size={24} color={COLORS.dark} />
+                        {itemCount > 0 && (
+                            <View
+                                className="absolute -top-1 -right-1 w-5 h-5 rounded-full items-center justify-center"
+                                style={{ backgroundColor: COLORS.danger }}
+                            >
+                                <Text className="text-white text-xs font-bold">
+                                    {itemCount > 9 ? '9+' : itemCount}
+                                </Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
+                }
+            >
+                {/* Search Bar */}
+                <View className="px-4 pt-4 pb-2">
+                    <TouchableOpacity
+                        onPress={() => router.push('/search')}
+                        className="flex-row items-center bg-white rounded-2xl px-4 py-3 border border-gray-200"
+                    >
+                        <Ionicons name="search" size={20} color={COLORS.gray} />
+                        <Text className="flex-1 ml-3 text-base" style={{ color: COLORS.gray }}>
+                            Ürün ara...
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Promo Carousel */}
+                <PromoCarousel />
+
+                {/* Categories */}
+                <View className="px-4 mt-4">
+                    <View className="flex-row items-center justify-between mb-3">
+                        <Text className="text-xl font-bold" style={{ color: COLORS.dark }}>
+                            Kategoriler
+                        </Text>
+                        <TouchableOpacity onPress={() => router.push('/(tabs)/categories')}>
+                            <Text style={{ color: COLORS.primary }} className="font-semibold">
+                                Hepsini Gör
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-4 px-4">
+                        {categories.map((category) => (
+                            <CategoryCard key={category.id} category={category} />
+                        ))}
+                    </ScrollView>
+                </View>
+
+                {/* Best Selling Products */}
+                <View className="px-4 mt-6">
+                    <View className="flex-row items-center justify-between mb-3">
+                        <Text className="text-xl font-bold" style={{ color: COLORS.dark }}>
+                            Çok Satanlar
+                        </Text>
+                        <TouchableOpacity>
+                            <Text style={{ color: COLORS.primary }} className="font-semibold">
+                                Hepsini Gör
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-4 px-4">
+                        {bestSellingProducts.map((product) => (
+                            <ProductCard key={product.id} product={product} />
+                        ))}
+                    </ScrollView>
+                </View>
+
+                {/* Featured Products */}
+                {featuredProducts.length > 0 && (
+                    <View className="px-4 mt-6 mb-6">
+                        <View className="flex-row items-center justify-between mb-3">
+                            <Text className="text-xl font-bold" style={{ color: COLORS.dark }}>
+                                Öne Çıkanlar
+                            </Text>
+                        </View>
+
+                        <View className="flex-row flex-wrap -mx-2">
+                            {featuredProducts.slice(0, 4).map((product) => (
+                                <View key={product.id} className="w-1/2 px-2 mb-4">
+                                    <ProductCard product={product} />
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                )}
+            </ScrollView>
+        </SafeAreaView>
+    );
 }
-
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});

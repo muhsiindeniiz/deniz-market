@@ -1,24 +1,69 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as SplashScreen from 'expo-splash-screen';
+import { useAuthStore } from '@/store/authStore';
+import Toast from '@/components/ui/Toast';
+import { useToast } from '@/hooks/useToast';
+import '../global.css';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const { checkAuth, isLoading } = useAuthStore();
+  const { visible, message, type, duration, hideToast } = useToast();
+
+  useEffect(() => {
+    const initialize = async () => {
+      await checkAuth();
+      await SplashScreen.hideAsync();
+    };
+
+    initialize();
+  }, []);
+
+  if (isLoading) {
+    return null;
+  }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="splash" />
+          <Stack.Screen name="(onboarding)" />
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="search" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="product/[id]" />
+          <Stack.Screen name="category/[id]" />
+          <Stack.Screen name="order-confirmation" />
+          <Stack.Screen name="order-tracking/[id]" />
+          <Stack.Screen name="addresses" />
+          <Stack.Screen name="add-address" />
+          <Stack.Screen name="edit-address/[id]" />
+          <Stack.Screen name="edit-profile" />
+          <Stack.Screen name="edit-email" />
+          <Stack.Screen name="notifications" />
+          <Stack.Screen name="settings" />
+          <Stack.Screen name="help" />
+          <Stack.Screen name="contact" />
+          <Stack.Screen name="terms" />
+          <Stack.Screen name="privacy" />
+          <Stack.Screen name="reviews/[productId]" />
+        </Stack>
+        <StatusBar style="auto" />
+        {visible && (
+          <Toast
+            message={message}
+            type={type}
+            duration={duration}
+            onHide={hideToast}
+          />
+        )}
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
