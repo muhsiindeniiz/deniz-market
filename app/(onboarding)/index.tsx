@@ -13,21 +13,18 @@ const onboardingData = [
         title: 'Deniz Market\'e Hoş Geldiniz',
         description: 'Çiftlikten sofraya taze meyve, sebze ve market ürünleri hızlı ve taze teslimat ile.',
         image: require('@/assets/images/onboarding1.jpg'),
-        backgroundColor: ['#E3F2FD', '#F3E5F5'],
     },
     {
         id: '2',
         title: 'Doğrudan Yerel Çiftçilerden',
         description: 'En iyi ürünleri almanızı sağlamak için yerel çiftçilerle yakın çalışıyoruz.',
         image: require('@/assets/images/onboarding2.jpg'),
-        backgroundColor: ['#F3E5F5', '#FFF3E0'],
     },
     {
         id: '3',
         title: 'Aynı Gün Teslimat',
         description: 'Günlük indirimlerin, flash satışların ve her alışverişte daha fazla tasarruf etmenizi sağlayan özel tekliflerin kilidini açın.',
         image: require('@/assets/images/onboarding1.jpg'),
-        backgroundColor: ['#FFF3E0', '#E8F5E9'],
     },
 ];
 
@@ -44,7 +41,11 @@ export default function OnboardingScreen() {
 
     const handleNext = () => {
         if (currentIndex < onboardingData.length - 1) {
-            flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
+            const nextIndex = currentIndex + 1;
+            flatListRef.current?.scrollToOffset({
+                offset: nextIndex * width,
+                animated: true
+            });
         } else {
             handleGetStarted();
         }
@@ -56,11 +57,7 @@ export default function OnboardingScreen() {
     };
 
     const renderItem = ({ item }: { item: typeof onboardingData[0] }) => (
-        <LinearGradient
-            colors={item.backgroundColor}
-            className="items-center justify-center"
-            style={{ width, height }}
-        >
+        <View className="items-center justify-center" style={{ width, height }}>
             <View className="flex-1 items-center justify-center px-8">
                 <Image
                     source={item.image}
@@ -74,11 +71,14 @@ export default function OnboardingScreen() {
                     {item.description}
                 </Text>
             </View>
-        </LinearGradient>
+        </View>
     );
 
     return (
-        <View className="flex-1">
+        <LinearGradient
+            colors={['#FFF3E0', '#E8F5E9']}
+            className="flex-1"
+        >
             <FlatList
                 ref={flatListRef}
                 data={onboardingData}
@@ -115,6 +115,6 @@ export default function OnboardingScreen() {
                     </Text>
                 </TouchableOpacity>
             </View>
-        </View>
+        </LinearGradient>
     );
 }

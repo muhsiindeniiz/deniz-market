@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { Product, Review } from '@/lib/types';
 import { useCartStore } from '@/store/cartStore';
 import { useToast } from '@/hooks/useToast';
 import { COLORS } from '@/lib/constants';
+import { ProductDetailSkeleton } from '@/components/ui/Loading';
 
 const { width } = Dimensions.get('window');
 
@@ -69,9 +70,20 @@ export default function ProductDetailScreen() {
 
     if (loading) {
         return (
-            <View className="flex-1 items-center justify-center" style={{ backgroundColor: COLORS.background }}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-            </View>
+            <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.white }}>
+                <View className="px-4 py-3 flex-row items-center justify-between border-b border-gray-200">
+                    <TouchableOpacity onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
+                    </TouchableOpacity>
+                    <Text className="text-lg font-semibold" style={{ color: COLORS.dark }}>
+                        Ürün Detayı
+                    </Text>
+                    <TouchableOpacity onPress={() => router.push('/cart')}>
+                        <Ionicons name="cart-outline" size={24} color={COLORS.dark} />
+                    </TouchableOpacity>
+                </View>
+                <ProductDetailSkeleton />
+            </SafeAreaView>
         );
     }
 
