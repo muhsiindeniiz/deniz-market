@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/useToast';
 import { COLORS } from '@/lib/constants';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ForgotPasswordScreen() {
     const router = useRouter();
@@ -45,7 +46,12 @@ export default function ForgotPasswordScreen() {
 
     if (emailSent) {
         return (
-            <LinearGradient colors={['#E8F5E9', '#FFFFFF']} className="flex-1">
+            <LinearGradient
+                colors={['#E8F5E9', '#FFFFFF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={{ flex: 1 }}
+            >
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                     className="flex-1"
@@ -118,12 +124,17 @@ export default function ForgotPasswordScreen() {
     }
 
     return (
-        <LinearGradient colors={['#E8F5E9', '#FFFFFF']} className="flex-1">
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                className="flex-1"
-            >
-                <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        <LinearGradient
+            colors={['#E8F5E9', '#FFFFFF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={{ flex: 1 }}
+        >
+            <SafeAreaView style={{ flex: 1 }}>
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ flexGrow: 1 }}
+                >
                     <View className="flex-1 px-6 pt-16 pb-8">
                         {/* Back Button */}
                         <TouchableOpacity
@@ -207,7 +218,7 @@ export default function ForgotPasswordScreen() {
                         </View>
                     </View>
                 </ScrollView>
-            </KeyboardAvoidingView>
+            </SafeAreaView>
         </LinearGradient>
     );
 }

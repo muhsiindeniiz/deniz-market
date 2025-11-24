@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useAuthStore } from '@/store/authStore';
 import Toast from '@/components/ui/Toast';
 import { useToast } from '@/hooks/useToast';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import '../global.css';
 
 SplashScreen.preventAutoHideAsync();
@@ -17,6 +18,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     const initialize = async () => {
+      GoogleSignin.configure({
+        iosClientId: "491979314052-k2kna9glv0phkhbjf59tiaikfmugd2nu.apps.googleusercontent.com",
+        webClientId: "491979314052-0usbel7amqladm9c0nl6549b70fb48u6.apps.googleusercontent.com",
+        offlineAccess: true,
+      });
+
       await checkAuth();
       await SplashScreen.hideAsync();
     };

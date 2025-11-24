@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { Category } from '@/lib/types';
 import { COLORS } from '@/lib/constants';
+import { CategoryCardSkeleton } from '@/components/ui/Loading';
 
 export default function CategoriesScreen() {
     const router = useRouter();
@@ -64,6 +65,23 @@ export default function CategoriesScreen() {
             </View>
         </TouchableOpacity>
     );
+
+    if (loading) {
+        return (
+            <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+                <View className="bg-white px-4 py-4 border-b border-gray-200">
+                    <Text className="text-2xl font-bold" style={{ color: COLORS.dark }}>
+                        Kategoriler
+                    </Text>
+                </View>
+                <ScrollView className="pt-4">
+                    {[1, 2, 3, 4, 5].map((item) => (
+                        <CategoryCardSkeleton key={item} />
+                    ))}
+                </ScrollView>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>

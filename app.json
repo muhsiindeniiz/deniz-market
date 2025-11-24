@@ -9,24 +9,23 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.deniz.market",
       "buildConfiguration": "Release",
       "autoIncrement": true,
+      "supportsTablet": true,
+      "bundleIdentifier": "com.deniz.market",
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "buildType": "app-bundle",
       "autoIncrement": true,
-      "package": "com.koordinat.coffee",
-      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundColor": "#4A2C2A"
       },
+      "versionCode": 1,
+      "package": "com.deniz.market",
       "edgeToEdgeEnabled": true,
+      "googleServicesFile": "./google-services.json",
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -35,6 +34,12 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.491979314052-k2kna9glv0phkhbjf59tiaikfmugd2nu"
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
@@ -47,11 +52,18 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "702cb85e-82a8-4527-a574-975ecb990550"
+      }
     }
   }
 }

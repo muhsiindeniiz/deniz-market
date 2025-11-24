@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, FlatList } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,7 +8,7 @@ import { Product, Category } from '@/lib/types';
 import { COLORS } from '@/lib/constants';
 import ProductCard from '@/components/home/ProductCard';
 import BottomSheet from '@gorhom/bottom-sheet';
-import { useRef } from 'react';
+import { ProductCardSkeleton } from '@/components/ui/Loading';
 
 export default function CategoryDetailScreen() {
     const router = useRouter();
@@ -111,9 +111,35 @@ export default function CategoryDetailScreen() {
 
     if (loading) {
         return (
-            <View className="flex-1 items-center justify-center" style={{ backgroundColor: COLORS.background }}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-            </View>
+            <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+                <View className="bg-white px-4 py-4 flex-row items-center justify-between border-b border-gray-200">
+                    <View className="flex-row items-center flex-1">
+                        <TouchableOpacity onPress={() => router.back()} className="mr-3">
+                            <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
+                        </TouchableOpacity>
+                        <View className="flex-1">
+                            <View style={{ width: '60%', height: 20, backgroundColor: COLORS.gray + '30', borderRadius: 4 }} />
+                        </View>
+                    </View>
+                    <TouchableOpacity onPress={() => router.push('/cart')} className="ml-3">
+                        <Ionicons name="cart-outline" size={24} color={COLORS.dark} />
+                    </TouchableOpacity>
+                </View>
+
+                <View className="bg-white px-4 py-3 border-b border-gray-200">
+                    <View className="flex-row items-center">
+                        <View className="flex-1 h-12 bg-gray-100 rounded-xl mr-3" />
+                        <View className="w-12 h-12 rounded-xl bg-gray-100 mr-2" />
+                        <View className="w-12 h-12 rounded-xl bg-gray-100" />
+                    </View>
+                </View>
+
+                <ScrollView horizontal className="px-4 mt-4" showsHorizontalScrollIndicator={false}>
+                    {[1, 2].map((item) => (
+                        <ProductCardSkeleton key={item} />
+                    ))}
+                </ScrollView>
+            </SafeAreaView>
         );
     }
 
