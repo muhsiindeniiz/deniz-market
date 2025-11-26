@@ -345,13 +345,18 @@ export default function ProductDetailScreen() {
                         </View>
                     </View>
 
-                    {/* Quantity Selector */}
                     <View className="flex-row items-center bg-gray-100 rounded-xl">
                         <TouchableOpacity
                             onPress={() => setQuantity(Math.max(1, quantity - 1))}
+                            disabled={quantity <= 1}
                             className="w-10 h-10 items-center justify-center"
+                            activeOpacity={0.7}
                         >
-                            <Ionicons name="remove" size={20} color={COLORS.dark} />
+                            <Ionicons
+                                name="remove"
+                                size={20}
+                                color={quantity <= 1 ? COLORS.gray : COLORS.dark}
+                            />
                         </TouchableOpacity>
 
                         <Text className="text-lg font-semibold px-4" style={{ color: COLORS.dark }}>
@@ -360,9 +365,15 @@ export default function ProductDetailScreen() {
 
                         <TouchableOpacity
                             onPress={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                            disabled={quantity >= product.stock}
                             className="w-10 h-10 items-center justify-center"
+                            activeOpacity={0.7}
                         >
-                            <Ionicons name="add" size={20} color={COLORS.dark} />
+                            <Ionicons
+                                name="add"
+                                size={20}
+                                color={quantity >= product.stock ? COLORS.gray : COLORS.dark}
+                            />
                         </TouchableOpacity>
                     </View>
                 </View>

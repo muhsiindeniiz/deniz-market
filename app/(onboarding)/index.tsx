@@ -1,4 +1,3 @@
-// app/(onboarding)/index.tsx
 import { useState, useRef } from 'react';
 import { View, Text, Image, FlatList, Dimensions, TouchableOpacity, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { useRouter } from 'expo-router';

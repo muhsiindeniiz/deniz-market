@@ -75,7 +75,7 @@ export default function CompleteProfileScreen() {
         }
     };
 
-    // Phone input mask handler (05XX XXX XX XX)
+    // Phone input mask handler (05XX XXX XX XX) - FIXED
     const handlePhoneChange = (text: string) => {
         // Remove all non-numeric characters
         const cleaned = text.replace(/\D/g, '');
@@ -83,22 +83,36 @@ export default function CompleteProfileScreen() {
         // Limit to 11 digits
         const limited = cleaned.substring(0, 11);
 
-        // Apply mask
-        let formatted = limited;
-        if (limited.length > 3) {
-            formatted = limited.substring(0, 4) + ' ' + limited.substring(4);
+        // Apply formatting based on length
+        if (limited.length === 0) {
+            setPhone('');
+            return;
         }
-        if (limited.length > 6) {
-            formatted = limited.substring(0, 4) + ' ' + limited.substring(4, 7) + ' ' + limited.substring(7);
+
+        let formatted = '';
+        
+        // First 4 digits (05XX)
+        formatted = limited.substring(0, 4);
+        
+        // Add space and next 3 digits if available
+        if (limited.length >= 5) {
+            formatted += ' ' + limited.substring(4, 7);
         }
-        if (limited.length > 9) {
-            formatted = limited.substring(0, 4) + ' ' + limited.substring(4, 7) + ' ' + limited.substring(7, 9) + ' ' + limited.substring(9);
+        
+        // Add space and next 2 digits if available
+        if (limited.length >= 8) {
+            formatted += ' ' + limited.substring(7, 9);
+        }
+        
+        // Add space and last 2 digits if available
+        if (limited.length >= 10) {
+            formatted += ' ' + limited.substring(9, 11);
         }
 
         setPhone(formatted);
     };
 
-    // Birth date input mask handler (DD/MM/YYYY)
+    // Birth date input mask handler (DD/MM/YYYY) - FIXED
     const handleBirthDateChange = (text: string) => {
         // Remove all non-numeric characters
         const cleaned = text.replace(/\D/g, '');
@@ -106,13 +120,25 @@ export default function CompleteProfileScreen() {
         // Limit to 8 digits
         const limited = cleaned.substring(0, 8);
 
-        // Apply mask
-        let formatted = limited;
-        if (limited.length > 2) {
-            formatted = limited.substring(0, 2) + '/' + limited.substring(2);
+        // Apply formatting based on length
+        if (limited.length === 0) {
+            setBirthDate('');
+            return;
         }
-        if (limited.length > 4) {
-            formatted = limited.substring(0, 2) + '/' + limited.substring(2, 4) + '/' + limited.substring(4);
+
+        let formatted = '';
+        
+        // First 2 digits (DD)
+        formatted = limited.substring(0, 2);
+        
+        // Add slash and next 2 digits (MM) if available
+        if (limited.length >= 3) {
+            formatted += '/' + limited.substring(2, 4);
+        }
+        
+        // Add slash and last 4 digits (YYYY) if available
+        if (limited.length >= 5) {
+            formatted += '/' + limited.substring(4, 8);
         }
 
         setBirthDate(formatted);
@@ -138,13 +164,25 @@ export default function CompleteProfileScreen() {
         const inputDate = new Date(year, month - 1, day);
         if (inputDate > new Date()) return false;
 
+        // Check minimum age (13 years old)
+        const thirteenYearsAgo = new Date();
+        thirteenYearsAgo.setFullYear(currentYear - 13);
+        if (inputDate > thirteenYearsAgo) return false;
+
         return true;
     };
 
     const handleComplete = async () => {
         // Validate all required fields
         if (!fullName.trim()) {
-            showToast('Lütfen adınızı girin', 'warning');
+            showToast('Lütfen adınızı ve soyadınızı girin', 'warning');
+            return;
+        }
+
+        // Check if name has at least 2 words (first name and last name)
+        const nameParts = fullName.trim().split(/\s+/);
+        if (nameParts.length < 2) {
+            showToast('Lütfen ad ve soyadınızı girin', 'warning');
             return;
         }
 
@@ -155,6 +193,11 @@ export default function CompleteProfileScreen() {
 
         // Validate phone (must be 11 digits)
         const phoneDigits = phone.replace(/\D/g, '');
+        if (phoneDigits.length < 11) {
+            showToast('Telefon numarasını eksiksiz girin (11 hane)', 'warning');
+            return;
+        }
+
         if (phoneDigits.length !== 11) {
             showToast('Telefon numarası 11 haneli olmalıdır', 'warning');
             return;
@@ -173,6 +216,11 @@ export default function CompleteProfileScreen() {
 
         // Validate birth date (must be DD/MM/YYYY)
         const birthDateDigits = birthDate.replace(/\D/g, '');
+        if (birthDateDigits.length < 8) {
+            showToast('Doğum tarihini eksiksiz girin (GG/AA/YYYY)', 'warning');
+            return;
+        }
+
         if (birthDateDigits.length !== 8) {
             showToast('Doğum tarihi GG/AA/YYYY formatında olmalıdır', 'warning');
             return;
@@ -183,7 +231,50 @@ export default function CompleteProfileScreen() {
         const month = parseInt(birthDateDigits.substring(2, 4));
         const year = parseInt(birthDateDigits.substring(4, 8));
 
+        // Check for invalid numbers
+        if (isNaN(day) || isNaN(month) || isNaN(year)) {
+            showToast('Geçerli bir doğum tarihi girin', 'warning');
+            return;
+        }
+
         if (!isValidDate(day, month, year)) {
+            // Provide more specific error messages
+            const currentYear = new Date().getFullYear();
+            if (year < 1900 || year > currentYear) {
+                showToast('Geçerli bir yıl girin (1900-' + currentYear + ')', 'warning');
+                return;
+            }
+            if (month < 1 || month > 12) {
+                showToast('Geçerli bir ay girin (01-12)', 'warning');
+                return;
+            }
+            if (day < 1 || day > 31) {
+                showToast('Geçerli bir gün girin (01-31)', 'warning');
+                return;
+            }
+
+            // Check if date is in the future
+            const inputDate = new Date(year, month - 1, day);
+            if (inputDate > new Date()) {
+                showToast('Doğum tarihi gelecekte olamaz', 'warning');
+                return;
+            }
+
+            // Check minimum age
+            const thirteenYearsAgo = new Date();
+            thirteenYearsAgo.setFullYear(currentYear - 13);
+            if (inputDate > thirteenYearsAgo) {
+                showToast('En az 13 yaşında olmalısınız', 'warning');
+                return;
+            }
+
+            // Check days in month
+            const daysInMonth = new Date(year, month, 0).getDate();
+            if (day > daysInMonth) {
+                showToast(`${month}. ayda ${day} gün yoktur`, 'warning');
+                return;
+            }
+
             showToast('Geçerli bir doğum tarihi girin', 'warning');
             return;
         }
@@ -358,6 +449,7 @@ export default function CompleteProfileScreen() {
                                         className="flex-1 ml-3 text-base"
                                         placeholderTextColor={COLORS.gray}
                                         editable={!isLoading}
+                                        autoCapitalize="words"
                                     />
                                 </View>
                             </View>
@@ -381,10 +473,13 @@ export default function CompleteProfileScreen() {
                                         keyboardType="phone-pad"
                                         className="flex-1 ml-3 text-base"
                                         placeholderTextColor={COLORS.gray}
-                                        maxLength={15} // 11 digits + 3 spaces
+                                        maxLength={15} // 11 digits + 4 spaces
                                         editable={!isLoading}
                                     />
                                 </View>
+                                <Text className="text-xs mt-1 ml-1" style={{ color: COLORS.gray }}>
+                                    Örnek: 0555 123 45 67
+                                </Text>
                             </View>
 
                             {/* Birth Date Input */}
