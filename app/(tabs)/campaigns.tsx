@@ -163,7 +163,7 @@ export default function CampaignsScreen() {
     const displayedProducts = getDisplayedProducts();
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+        <SafeAreaView style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 border-b border-gray-200">
                 <Text className="text-2xl font-bold" style={{ color: COLORS.dark }}>

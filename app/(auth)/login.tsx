@@ -1,3 +1,4 @@
+// app/(auth)/login.tsx
 import { useState, useEffect } from "react";
 import {
     View,
@@ -8,6 +9,7 @@ import {
     ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
+    Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,6 +25,35 @@ import {
     isSuccessResponse,
     isErrorWithCode,
 } from "@react-native-google-signin/google-signin";
+import * as AppleAuthentication from "expo-apple-authentication";
+const logo = require("@/assets/images/logo.png");
+
+const BENEFITS = [
+    {
+        icon: "rocket",
+        title: "Hızlı Teslimat",
+        subtitle: "Siparişin kısa sürede kapında",
+        color: "#FF6B6B",
+    },
+    {
+        icon: "pricetag",
+        title: "Yeni İndirimler",
+        subtitle: "Fırsat ürünleri",
+        color: "#4ECDC4",
+    },
+    {
+        icon: "grid",
+        title: "Yüzlerce Ürün",
+        subtitle: "Aradığın her şey tek yerde",
+        color: "#9B59B6",
+    },
+    {
+        icon: "refresh",
+        title: "Kolay İade",
+        subtitle: "Sorunsuz değişim ve iade",
+        color: "#3498DB",
+    },
+];
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -31,13 +62,17 @@ export default function LoginScreen() {
     const [isLoading, setIsLoading] = useState(false);
     const [provider, setProvider] = useState<string>("");
     const [showEmailForm, setShowEmailForm] = useState(false);
-
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+    const [currentBenefit, setCurrentBenefit] = useState(0);
 
     useEffect(() => {
         configureGoogleSignIn();
+        const interval = setInterval(() => {
+            setCurrentBenefit((prev) => (prev + 1) % BENEFITS.length);
+        }, 3000);
+        return () => clearInterval(interval);
     }, []);
 
     const configureGoogleSignIn = async () => {
@@ -46,9 +81,8 @@ export default function LoginScreen() {
                 webClientId: "491979314052-0usbel7amqladm9c0nl6549b70fb48u6.apps.googleusercontent.com",
                 iosClientId: "491979314052-k2kna9glv0phkhbjf59tiaikfmugd2nu.apps.googleusercontent.com",
                 offlineAccess: true,
-                scopes: ['profile', 'email'],
+                scopes: ["profile", "email"],
             });
-            console.log("Google Sign-In configured successfully");
         } catch (error) {
             console.error("Google Sign-In configuration error:", error);
         }
@@ -60,28 +94,17 @@ export default function LoginScreen() {
         fullName?: string
     ) => {
         try {
-            console.log("=== checkUserAndNavigate called ===");
-            console.log("UserId:", userId);
-            console.log("Email:", userEmail);
-            console.log("Full Name:", fullName);
-
             const { data: userData, error: userError } = await supabase
                 .from("users")
                 .select("*")
                 .eq("id", userId)
                 .maybeSingle();
 
-            console.log("User data from DB:", userData);
-            console.log("User error:", userError);
-
             if (userError && userError.code !== "PGRST116") {
-                console.error("Database error:", userError);
                 throw userError;
             }
 
             if (!userData) {
-                console.log("User not found in DB, creating new profile...");
-
                 const { data: newUser, error: insertError } = await supabase
                     .from("users")
                     .insert([
@@ -97,7 +120,6 @@ export default function LoginScreen() {
                     .single();
 
                 if (insertError) {
-                    console.error("Insert error:", insertError);
                     if (insertError.code === "23505") {
                         const { data: existingUser } = await supabase
                             .from("users")
@@ -112,8 +134,6 @@ export default function LoginScreen() {
                     throw insertError;
                 }
 
-                console.log("New user created:", newUser);
-                console.log("Redirecting to complete-profile...");
                 router.replace("/(auth)/complete-profile");
                 return;
             }
@@ -126,18 +146,14 @@ export default function LoginScreen() {
     };
 
     const handleExistingUser = async (userData: any) => {
-        console.log("Handling existing user:", userData);
-
         const isProfileComplete =
             userData.phone && userData.phone.trim() !== "" && userData.birth_date;
 
         if (!isProfileComplete) {
-            console.log("Profile incomplete, redirecting to complete-profile");
             router.replace("/(auth)/complete-profile");
         } else {
-            console.log("Profile complete, redirecting to home");
             setUser(userData);
-            showToast("Giriş başarılı!", "success");
+            showToast("Hoş geldiniz! 🎉", "success");
             router.replace("/(tabs)");
         }
     };
@@ -174,7 +190,6 @@ export default function LoginScreen() {
                 );
             }
         } catch (error: any) {
-            console.error("Email login error:", error);
             showToast(error.message || "Giriş yapılamadı", "error");
         } finally {
             setIsLoading(false);
@@ -186,71 +201,54 @@ export default function LoginScreen() {
         try {
             setIsLoading(true);
             setProvider("google");
-            console.log("=== Starting Google login ===");
 
-            // Önce mevcut oturumu temizle
             try {
                 await GoogleSignin.signOut();
-                console.log("Previous session signed out");
             } catch (e) {
-                console.log("No previous session to sign out");
+                // No previous session
             }
 
-            // Play Services kontrolü
-            const hasPlayServices = await GoogleSignin.hasPlayServices({
-                showPlayServicesUpdateDialog: true
+            await GoogleSignin.hasPlayServices({
+                showPlayServicesUpdateDialog: true,
             });
-            console.log("Has Play Services:", hasPlayServices);
 
-            // Google Sign-In'i başlat
-            console.log("Calling GoogleSignin.signIn()...");
             const response = await GoogleSignin.signIn();
-            console.log("Google Sign-In response received");
 
-            // Yeni API kontrolü
             if (!isSuccessResponse(response)) {
-                console.log("Google sign in was not successful or cancelled");
                 showToast("Giriş iptal edildi", "info");
                 return;
             }
 
             const { idToken, user: googleUser } = response.data;
 
-            console.log("Google User Email:", googleUser?.email);
-            console.log("Has ID Token:", !!idToken);
-
             if (!googleUser || !googleUser.email) {
                 throw new Error("Google kullanıcı bilgileri alınamadı");
             }
 
             if (!idToken) {
-                console.log("No ID token, trying alternative approach...");
-                // ID Token yoksa alternatif yaklaşım
                 await handleGoogleUserWithoutToken(googleUser);
                 return;
             }
 
-            // Supabase ile kimlik doğrula
-            console.log("Authenticating with Supabase...");
-
-            const { data: authData, error: authError } = await supabase.auth.signInWithIdToken({
-                provider: "google",
-                token: idToken,
-            });
+            const { data: authData, error: authError } =
+                await supabase.auth.signInWithIdToken({
+                    provider: "google",
+                    token: idToken,
+                });
 
             if (authError) {
-                console.error("Supabase auth error:", authError.message);
-                console.error("Supabase auth error code:", authError.status);
-
-                // Network hatası kontrolü
-                if (authError.message.includes("Network") || authError.message.includes("fetch")) {
+                if (
+                    authError.message.includes("Network") ||
+                    authError.message.includes("fetch")
+                ) {
                     showToast("İnternet bağlantınızı kontrol edin", "error");
                     return;
                 }
 
-                // Token hatası - alternatif yaklaşım dene
-                if (authError.message.includes("token") || authError.message.includes("nonce")) {
-                    console.log("Token error, trying alternative approach...");
+                if (
+                    authError.message.includes("token") ||
+                    authError.message.includes("nonce")
+                ) {
                     await handleGoogleUserWithoutToken(googleUser);
                     return;
                 }
@@ -259,9 +257,6 @@ export default function LoginScreen() {
             }
 
             if (authData?.user) {
-                console.log("Supabase authentication successful");
-                console.log("Supabase user ID:", authData.user.id);
-
                 await checkUserAndNavigate(
                     authData.user.id,
                     googleUser.email,
@@ -269,12 +264,6 @@ export default function LoginScreen() {
                 );
             }
         } catch (error: any) {
-            console.error("=== Google login error ===");
-            console.error("Error:", error);
-            console.error("Error code:", error?.code);
-            console.error("Error message:", error?.message);
-
-            // Hata türüne göre işlem
             if (isErrorWithCode(error)) {
                 switch (error.code) {
                     case statusCodes.SIGN_IN_CANCELLED:
@@ -290,9 +279,7 @@ export default function LoginScreen() {
                         handleGenericGoogleError(error);
                 }
             } else if (error?.message?.includes("Network request failed")) {
-                showToast("İnternet bağlantınızı kontrol edin ve tekrar deneyin", "error");
-            } else if (error?.message?.includes("DEVELOPER_ERROR")) {
-                showToast("Google yapılandırma hatası. Lütfen daha sonra tekrar deneyin.", "error");
+                showToast("İnternet bağlantınızı kontrol edin", "error");
             } else {
                 handleGenericGoogleError(error);
             }
@@ -304,8 +291,6 @@ export default function LoginScreen() {
 
     const handleGenericGoogleError = (error: any) => {
         const message = error?.message || "Google girişi yapılamadı";
-
-        // Daha kullanıcı dostu mesajlar
         if (message.includes("Network")) {
             showToast("İnternet bağlantı hatası", "error");
         } else if (message.includes("timeout")) {
@@ -316,12 +301,8 @@ export default function LoginScreen() {
         }
     };
 
-    // Google kullanıcısı için token olmadan giriş
     const handleGoogleUserWithoutToken = async (googleUser: any) => {
         try {
-            console.log("Handling Google user without token:", googleUser.email);
-
-            // Users tablosunda bu e-posta var mı kontrol et
             const { data: existingUser, error: checkError } = await supabase
                 .from("users")
                 .select("*")
@@ -329,15 +310,12 @@ export default function LoginScreen() {
                 .maybeSingle();
 
             if (checkError && checkError.code !== "PGRST116") {
-                console.error("Check user error:", checkError);
                 throw checkError;
             }
 
             if (existingUser) {
-                // Kullanıcı mevcut - e-posta/şifre ile giriş yapması gerekiyor
-                console.log("User exists with this email");
                 showToast(
-                    "Bu e-posta kayıtlı. Lütfen e-posta ve şifrenizle giriş yapın.",
+                    "Bu e-posta kayıtlı. Lütfen şifrenizle giriş yapın.",
                     "warning"
                 );
                 setShowEmailForm(true);
@@ -345,30 +323,120 @@ export default function LoginScreen() {
                 return;
             }
 
-            // Kullanıcı yok - kayıt sayfasına yönlendir
-            showToast("Hesabınız bulunamadı. Lütfen kayıt olun.", "info");
+            showToast("Hesabınız bulunamadı. Kayıt olun!", "info");
             router.push({
                 pathname: "/(auth)/register",
                 params: {
                     email: googleUser.email,
                     fullName: googleUser.name || "",
-                }
+                },
             });
-
         } catch (error: any) {
-            console.error("handleGoogleUserWithoutToken error:", error);
-            showToast("Bir hata oluştu. Lütfen e-posta ile giriş yapın.", "error");
+            showToast("Bir hata oluştu. E-posta ile giriş yapın.", "error");
             setShowEmailForm(true);
         }
     };
 
-    const handleFacebookLogin = async () => {
-        showToast("Facebook girişi yakında eklenecek", "info");
+    const handleAppleLogin = async () => {
+        try {
+            setIsLoading(true);
+            setProvider("apple");
+
+            const credential = await AppleAuthentication.signInAsync({
+                requestedScopes: [
+                    AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+                    AppleAuthentication.AppleAuthenticationScope.EMAIL,
+                ],
+            });
+
+            if (!credential.identityToken) {
+                throw new Error("Apple kimlik doğrulama başarısız");
+            }
+
+            const { data: authData, error: authError } =
+                await supabase.auth.signInWithIdToken({
+                    provider: "apple",
+                    token: credential.identityToken,
+                });
+
+            if (authError) {
+                throw authError;
+            }
+
+            if (authData?.user) {
+                let fullName = "";
+                if (credential.fullName) {
+                    const nameParts: string[] = [];
+                    if (credential.fullName.givenName)
+                        nameParts.push(credential.fullName.givenName);
+                    if (credential.fullName.middleName)
+                        nameParts.push(credential.fullName.middleName);
+                    if (credential.fullName.familyName)
+                        nameParts.push(credential.fullName.familyName);
+                    fullName = nameParts.join(" ");
+
+                    if (fullName) {
+                        await supabase.auth.updateUser({
+                            data: {
+                                full_name: fullName,
+                                given_name: credential.fullName.givenName,
+                                family_name: credential.fullName.familyName,
+                            },
+                        });
+                    }
+                }
+
+                await checkUserAndNavigate(
+                    authData.user.id,
+                    authData.user.email || credential.email || "",
+                    fullName || authData.user.user_metadata?.full_name
+                );
+            }
+        } catch (error: any) {
+            if (error.code === "ERR_REQUEST_CANCELED") {
+                showToast("Giriş iptal edildi", "info");
+            } else {
+                console.error("Apple login error:", error);
+                showToast("Apple girişi başarısız. E-posta ile deneyin.", "error");
+                setShowEmailForm(true);
+            }
+        } finally {
+            setIsLoading(false);
+            setProvider("");
+        }
     };
+
+    const handleFacebookLogin = async () => {
+        try {
+            setIsLoading(true);
+            setProvider("facebook");
+
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: "facebook",
+                options: {
+                    redirectTo: "denizmarket://auth/callback",
+                    skipBrowserRedirect: false,
+                },
+            });
+
+            if (error) {
+                throw error;
+            }
+        } catch (error: any) {
+            console.error("Facebook login error:", error);
+            showToast("Facebook girişi başarısız. E-posta ile deneyin.", "error");
+            setShowEmailForm(true);
+        } finally {
+            setIsLoading(false);
+            setProvider("");
+        }
+    };
+
+    const currentBenefitData = BENEFITS[currentBenefit];
 
     return (
         <LinearGradient
-            colors={["#E8F5E9", "#FFFFFF"]}
+            colors={["#F0FDF4", "#ECFDF5", "#FFFFFF"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={{ flex: 1 }}
@@ -382,205 +450,333 @@ export default function LoginScreen() {
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ flexGrow: 1 }}
                         keyboardShouldPersistTaps="handled"
+                        bounces={false}
                     >
                         <View
                             style={{
                                 flex: 1,
                                 paddingHorizontal: 24,
-                                paddingTop: 48,
-                                paddingBottom: 32,
+                                paddingTop: 20,
+                                paddingBottom: 24,
                             }}
                         >
-                            {/* Logo */}
-                            <View style={{ alignItems: "center", marginBottom: 48 }}>
+                            {/* Logo & Brand Section */}
+                            <View style={{ alignItems: "center", marginBottom: 24 }}>
+                                <Image
+                                    source={logo}
+                                    style={{ width: 96, height: 96, marginBottom: 20 }}
+                                    resizeMode="contain"
+                                />
+
+                                <Text
+                                    style={{
+                                        fontSize: 26,
+                                        fontWeight: "800",
+                                        color: COLORS.dark,
+                                        letterSpacing: -0.5,
+                                    }}
+                                >
+                                    Deniz Market
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 15,
+                                        color: COLORS.gray,
+                                        marginTop: 4,
+                                    }}
+                                >
+                                    Taze • Hızlı • Uygun Fiyatlı
+                                </Text>
+                            </View>
+
+                            {/* Benefit Carousel */}
+                            <View
+                                style={{
+                                    backgroundColor: currentBenefitData.color + "15",
+                                    borderRadius: 16,
+                                    padding: 16,
+                                    marginBottom: 24,
+                                    borderWidth: 1,
+                                    borderColor: currentBenefitData.color + "30",
+                                }}
+                            >
                                 <View
                                     style={{
-                                        width: 128,
-                                        height: 128,
-                                        borderRadius: 64,
+                                        flexDirection: "row",
                                         alignItems: "center",
-                                        justifyContent: "center",
-                                        marginBottom: 24,
-                                        backgroundColor: COLORS.primary + "20",
                                     }}
                                 >
-                                    <Ionicons
-                                        name="bag-handle"
-                                        size={64}
-                                        color={COLORS.primary}
-                                    />
+                                    <View
+                                        style={{
+                                            width: 48,
+                                            height: 48,
+                                            borderRadius: 14,
+                                            backgroundColor: currentBenefitData.color + "20",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                        }}
+                                    >
+                                        <Ionicons
+                                            name={currentBenefitData.icon as any}
+                                            size={24}
+                                            color={currentBenefitData.color}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <Text
+                                            style={{
+                                                fontSize: 16,
+                                                fontWeight: "700",
+                                                color: COLORS.dark,
+                                            }}
+                                        >
+                                            {currentBenefitData.title}
+                                        </Text>
+                                        <Text
+                                            style={{
+                                                fontSize: 13,
+                                                color: COLORS.gray,
+                                                marginTop: 2,
+                                            }}
+                                        >
+                                            {currentBenefitData.subtitle}
+                                        </Text>
+                                    </View>
                                 </View>
-                                <Text
+
+                                {/* Carousel Dots */}
+                                <View
                                     style={{
-                                        fontSize: 28,
-                                        fontWeight: "bold",
-                                        marginBottom: 8,
-                                        color: COLORS.dark,
+                                        flexDirection: "row",
+                                        justifyContent: "center",
+                                        marginTop: 12,
+                                        gap: 6,
                                     }}
                                 >
-                                    Deniz Market&apos;e
-                                </Text>
-                                <Text
-                                    style={{
-                                        fontSize: 28,
-                                        fontWeight: "bold",
-                                        marginBottom: 16,
-                                        color: COLORS.dark,
-                                    }}
-                                >
-                                    Hoş Geldiniz
-                                </Text>
-                                <Text
-                                    style={{
-                                        fontSize: 16,
-                                        textAlign: "center",
-                                        color: COLORS.gray,
-                                    }}
-                                >
-                                    Taze ürünler için giriş yapın
-                                </Text>
+                                    {BENEFITS.map((_, index) => (
+                                        <View
+                                            key={index}
+                                            style={{
+                                                width: index === currentBenefit ? 20 : 6,
+                                                height: 6,
+                                                borderRadius: 3,
+                                                backgroundColor:
+                                                    index === currentBenefit
+                                                        ? currentBenefitData.color
+                                                        : currentBenefitData.color + "40",
+                                            }}
+                                        />
+                                    ))}
+                                </View>
                             </View>
 
                             {!showEmailForm ? (
                                 <>
-                                    {/* Google Login Button */}
-                                    <TouchableOpacity
-                                        onPress={handleGoogleLogin}
-                                        disabled={isLoading}
-                                        style={{
-                                            flexDirection: "row",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            borderRadius: 16,
-                                            paddingVertical: 16,
-                                            marginBottom: 16,
-                                            backgroundColor: "#FFFFFF",
-                                            borderWidth: 1,
-                                            borderColor: "#E0E0E0",
-                                            elevation: 3,
-                                            shadowColor: "#000",
-                                            shadowOffset: { width: 0, height: 2 },
-                                            shadowOpacity: 0.1,
-                                            shadowRadius: 4,
-                                            opacity: isLoading && provider === "google" ? 0.7 : 1,
-                                        }}
-                                        activeOpacity={0.8}
-                                    >
-                                        {isLoading && provider === "google" ? (
-                                            <ActivityIndicator size="small" color={COLORS.primary} />
-                                        ) : (
-                                            <>
-                                                <Ionicons
-                                                    name="logo-google"
-                                                    size={24}
-                                                    color="#DB4437"
-                                                />
-                                                <Text
-                                                    style={{
-                                                        fontSize: 16,
-                                                        fontWeight: "600",
-                                                        marginLeft: 12,
-                                                        color: COLORS.dark,
-                                                    }}
-                                                >
-                                                    Google ile Giriş Yap
-                                                </Text>
-                                            </>
-                                        )}
-                                    </TouchableOpacity>
+                                    {/* Social Login Buttons */}
+                                    <View style={{ gap: 12 }}>
+                                        {/* Google Button */}
+                                        <TouchableOpacity
+                                            onPress={handleGoogleLogin}
+                                            disabled={isLoading}
+                                            activeOpacity={0.8}
+                                            style={{
+                                                flexDirection: "row",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                borderRadius: 14,
+                                                paddingVertical: 15,
+                                                backgroundColor: "#FFFFFF",
+                                                borderWidth: 1.5,
+                                                borderColor: "#E5E7EB",
+                                                shadowColor: "#000",
+                                                shadowOffset: { width: 0, height: 2 },
+                                                shadowOpacity: 0.06,
+                                                shadowRadius: 8,
+                                                elevation: 2,
+                                                opacity: isLoading && provider === "google" ? 0.7 : 1,
+                                            }}
+                                        >
+                                            {isLoading && provider === "google" ? (
+                                                <ActivityIndicator size="small" color={COLORS.primary} />
+                                            ) : (
+                                                <>
+                                                    <View
+                                                        style={{
+                                                            width: 24,
+                                                            height: 24,
+                                                            marginRight: 12,
+                                                        }}
+                                                    >
+                                                        <Ionicons
+                                                            name="logo-google"
+                                                            size={24}
+                                                            color="#EA4335"
+                                                        />
+                                                    </View>
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 16,
+                                                            fontWeight: "600",
+                                                            color: COLORS.dark,
+                                                        }}
+                                                    >
+                                                        Google ile devam et
+                                                    </Text>
+                                                </>
+                                            )}
+                                        </TouchableOpacity>
 
-                                    {/* Facebook Login Button */}
-                                    <TouchableOpacity
-                                        onPress={handleFacebookLogin}
-                                        disabled={isLoading}
-                                        style={{
-                                            flexDirection: "row",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            borderRadius: 16,
-                                            paddingVertical: 16,
-                                            marginBottom: 32,
-                                            backgroundColor: "#1877F2",
-                                            elevation: 3,
-                                            shadowColor: "#000",
-                                            shadowOffset: { width: 0, height: 2 },
-                                            shadowOpacity: 0.1,
-                                            shadowRadius: 4,
-                                            opacity: isLoading && provider === "facebook" ? 0.7 : 1,
-                                        }}
-                                        activeOpacity={0.8}
-                                    >
-                                        {isLoading && provider === "facebook" ? (
-                                            <ActivityIndicator size="small" color="#FFFFFF" />
-                                        ) : (
-                                            <>
-                                                <Ionicons
-                                                    name="logo-facebook"
-                                                    size={24}
-                                                    color="#FFFFFF"
-                                                />
-                                                <Text
-                                                    style={{
-                                                        fontSize: 16,
-                                                        fontWeight: "600",
-                                                        marginLeft: 12,
-                                                        color: "#FFFFFF",
-                                                    }}
-                                                >
-                                                    Facebook ile Giriş Yap
-                                                </Text>
-                                            </>
+                                        {/* Apple Button - iOS Only */}
+                                        {Platform.OS === "ios" && (
+                                            <TouchableOpacity
+                                                onPress={handleAppleLogin}
+                                                disabled={isLoading}
+                                                activeOpacity={0.8}
+                                                style={{
+                                                    flexDirection: "row",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    borderRadius: 14,
+                                                    paddingVertical: 15,
+                                                    backgroundColor: "#000000",
+                                                    shadowColor: "#000",
+                                                    shadowOffset: { width: 0, height: 2 },
+                                                    shadowOpacity: 0.15,
+                                                    shadowRadius: 8,
+                                                    elevation: 3,
+                                                    opacity: isLoading && provider === "apple" ? 0.7 : 1,
+                                                }}
+                                            >
+                                                {isLoading && provider === "apple" ? (
+                                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                                ) : (
+                                                    <>
+                                                        <Ionicons
+                                                            name="logo-apple"
+                                                            size={22}
+                                                            color="#FFFFFF"
+                                                        />
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 16,
+                                                                fontWeight: "600",
+                                                                marginLeft: 10,
+                                                                color: "#FFFFFF",
+                                                            }}
+                                                        >
+                                                            Apple ile devam et
+                                                        </Text>
+                                                    </>
+                                                )}
+                                            </TouchableOpacity>
                                         )}
-                                    </TouchableOpacity>
+
+                                        {/* Facebook Button - Android Only */}
+                                        {Platform.OS === "android" && (
+                                            <TouchableOpacity
+                                                onPress={handleFacebookLogin}
+                                                disabled={isLoading}
+                                                activeOpacity={0.8}
+                                                style={{
+                                                    flexDirection: "row",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    borderRadius: 14,
+                                                    paddingVertical: 15,
+                                                    backgroundColor: "#1877F2",
+                                                    shadowColor: "#1877F2",
+                                                    shadowOffset: { width: 0, height: 2 },
+                                                    shadowOpacity: 0.25,
+                                                    shadowRadius: 8,
+                                                    elevation: 3,
+                                                    opacity: isLoading && provider === "facebook" ? 0.7 : 1,
+                                                }}
+                                            >
+                                                {isLoading && provider === "facebook" ? (
+                                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                                ) : (
+                                                    <>
+                                                        <Ionicons
+                                                            name="logo-facebook"
+                                                            size={22}
+                                                            color="#FFFFFF"
+                                                        />
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 16,
+                                                                fontWeight: "600",
+                                                                marginLeft: 10,
+                                                                color: "#FFFFFF",
+                                                            }}
+                                                        >
+                                                            Facebook ile devam et
+                                                        </Text>
+                                                    </>
+                                                )}
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
 
                                     {/* Divider */}
                                     <View
                                         style={{
                                             flexDirection: "row",
                                             alignItems: "center",
-                                            marginBottom: 32,
+                                            marginVertical: 24,
                                         }}
                                     >
                                         <View
                                             style={{
                                                 flex: 1,
                                                 height: 1,
-                                                backgroundColor: COLORS.gray + "40",
+                                                backgroundColor: "#E5E7EB",
                                             }}
                                         />
-                                        <Text style={{ marginHorizontal: 16, color: COLORS.gray }}>
+                                        <Text
+                                            style={{
+                                                marginHorizontal: 16,
+                                                color: COLORS.gray,
+                                                fontSize: 13,
+                                            }}
+                                        >
                                             veya
                                         </Text>
                                         <View
                                             style={{
                                                 flex: 1,
                                                 height: 1,
-                                                backgroundColor: COLORS.gray + "40",
+                                                backgroundColor: "#E5E7EB",
                                             }}
                                         />
                                     </View>
 
-                                    {/* Email Login Link */}
+                                    {/* Email Login Button */}
                                     <TouchableOpacity
                                         onPress={() => setShowEmailForm(true)}
-                                        style={{ alignItems: "center", paddingVertical: 12 }}
                                         disabled={isLoading}
+                                        activeOpacity={0.8}
+                                        style={{
+                                            flexDirection: "row",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            borderRadius: 14,
+                                            paddingVertical: 15,
+                                            backgroundColor: COLORS.primary + "10",
+                                            borderWidth: 1.5,
+                                            borderColor: COLORS.primary + "30",
+                                        }}
                                     >
-                                        <View
-                                            style={{ flexDirection: "row", alignItems: "center" }}
+                                        <Ionicons name="mail" size={20} color={COLORS.primary} />
+                                        <Text
+                                            style={{
+                                                fontSize: 16,
+                                                fontWeight: "600",
+                                                marginLeft: 10,
+                                                color: COLORS.primary,
+                                            }}
                                         >
-                                            <Ionicons name="mail" size={20} color={COLORS.primary} />
-                                            <Text
-                                                style={{
-                                                    fontSize: 16,
-                                                    fontWeight: "500",
-                                                    marginLeft: 8,
-                                                    color: COLORS.primary,
-                                                }}
-                                            >
-                                                E-posta ile giriş yap
-                                            </Text>
-                                        </View>
+                                            E-posta ile giriş yap
+                                        </Text>
                                     </TouchableOpacity>
                                 </>
                             ) : (
@@ -592,32 +788,49 @@ export default function LoginScreen() {
                                             setEmail("");
                                             setPassword("");
                                         }}
+                                        disabled={isLoading}
                                         style={{
                                             flexDirection: "row",
                                             alignItems: "center",
-                                            marginBottom: 24,
+                                            marginBottom: 20,
                                         }}
-                                        disabled={isLoading}
                                     >
-                                        <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
+                                        <View
+                                            style={{
+                                                width: 36,
+                                                height: 36,
+                                                borderRadius: 12,
+                                                backgroundColor: "#F3F4F6",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            <Ionicons
+                                                name="arrow-back"
+                                                size={20}
+                                                color={COLORS.dark}
+                                            />
+                                        </View>
                                         <Text
                                             style={{
-                                                marginLeft: 8,
-                                                fontSize: 16,
+                                                marginLeft: 12,
+                                                fontSize: 15,
+                                                fontWeight: "500",
                                                 color: COLORS.dark,
                                             }}
                                         >
-                                            Geri Dön
+                                            Diğer seçeneklere dön
                                         </Text>
                                     </TouchableOpacity>
 
                                     {/* Email Input */}
-                                    <View style={{ marginBottom: 16 }}>
+                                    <View style={{ marginBottom: 14 }}>
                                         <Text
                                             style={{
-                                                fontSize: 14,
+                                                fontSize: 13,
+                                                fontWeight: "600",
                                                 marginBottom: 8,
-                                                color: COLORS.gray,
+                                                color: COLORS.dark,
                                             }}
                                         >
                                             E-posta Adresi
@@ -628,10 +841,10 @@ export default function LoginScreen() {
                                                 alignItems: "center",
                                                 backgroundColor: "#FFFFFF",
                                                 borderRadius: 12,
-                                                paddingHorizontal: 16,
-                                                paddingVertical: 12,
-                                                borderWidth: 1,
-                                                borderColor: "#E5E5E5",
+                                                paddingHorizontal: 14,
+                                                paddingVertical: 14,
+                                                borderWidth: 1.5,
+                                                borderColor: "#E5E7EB",
                                             }}
                                         >
                                             <Ionicons
@@ -646,25 +859,27 @@ export default function LoginScreen() {
                                                 keyboardType="email-address"
                                                 autoCapitalize="none"
                                                 autoCorrect={false}
+                                                autoComplete="email"
                                                 style={{
                                                     flex: 1,
                                                     marginLeft: 12,
                                                     fontSize: 16,
                                                     color: COLORS.dark,
                                                 }}
-                                                placeholderTextColor={COLORS.gray}
+                                                placeholderTextColor="#9CA3AF"
                                                 editable={!isLoading}
                                             />
                                         </View>
                                     </View>
 
                                     {/* Password Input */}
-                                    <View style={{ marginBottom: 16 }}>
+                                    <View style={{ marginBottom: 14 }}>
                                         <Text
                                             style={{
-                                                fontSize: 14,
+                                                fontSize: 13,
+                                                fontWeight: "600",
                                                 marginBottom: 8,
-                                                color: COLORS.gray,
+                                                color: COLORS.dark,
                                             }}
                                         >
                                             Şifre
@@ -675,10 +890,10 @@ export default function LoginScreen() {
                                                 alignItems: "center",
                                                 backgroundColor: "#FFFFFF",
                                                 borderRadius: 12,
-                                                paddingHorizontal: 16,
-                                                paddingVertical: 12,
-                                                borderWidth: 1,
-                                                borderColor: "#E5E5E5",
+                                                paddingHorizontal: 14,
+                                                paddingVertical: 14,
+                                                borderWidth: 1.5,
+                                                borderColor: "#E5E7EB",
                                             }}
                                         >
                                             <Ionicons
@@ -691,13 +906,14 @@ export default function LoginScreen() {
                                                 value={password}
                                                 onChangeText={setPassword}
                                                 secureTextEntry={!showPassword}
+                                                autoComplete="password"
                                                 style={{
                                                     flex: 1,
                                                     marginLeft: 12,
                                                     fontSize: 16,
                                                     color: COLORS.dark,
                                                 }}
-                                                placeholderTextColor={COLORS.gray}
+                                                placeholderTextColor="#9CA3AF"
                                                 editable={!isLoading}
                                             />
                                             <TouchableOpacity
@@ -706,7 +922,7 @@ export default function LoginScreen() {
                                             >
                                                 <Ionicons
                                                     name={showPassword ? "eye-off" : "eye"}
-                                                    size={24}
+                                                    size={22}
                                                     color={COLORS.gray}
                                                 />
                                             </TouchableOpacity>
@@ -716,10 +932,19 @@ export default function LoginScreen() {
                                     {/* Forgot Password */}
                                     <TouchableOpacity
                                         onPress={() => router.push("/(auth)/forgot-password")}
-                                        style={{ alignItems: "flex-end", marginBottom: 24 }}
                                         disabled={isLoading}
+                                        style={{
+                                            alignSelf: "flex-end",
+                                            marginBottom: 20,
+                                        }}
                                     >
-                                        <Text style={{ color: COLORS.primary, fontWeight: "500" }}>
+                                        <Text
+                                            style={{
+                                                color: COLORS.primary,
+                                                fontWeight: "600",
+                                                fontSize: 14,
+                                            }}
+                                        >
                                             Şifremi unuttum
                                         </Text>
                                     </TouchableOpacity>
@@ -728,14 +953,18 @@ export default function LoginScreen() {
                                     <TouchableOpacity
                                         onPress={handleEmailLogin}
                                         disabled={isLoading}
+                                        activeOpacity={0.8}
                                         style={{
-                                            borderRadius: 12,
+                                            borderRadius: 14,
                                             paddingVertical: 16,
-                                            marginBottom: 16,
                                             backgroundColor: COLORS.primary,
+                                            shadowColor: COLORS.primary,
+                                            shadowOffset: { width: 0, height: 4 },
+                                            shadowOpacity: 0.3,
+                                            shadowRadius: 8,
+                                            elevation: 4,
                                             opacity: isLoading && provider === "email" ? 0.7 : 1,
                                         }}
-                                        activeOpacity={0.8}
                                     >
                                         {isLoading && provider === "email" ? (
                                             <ActivityIndicator size="small" color="#FFFFFF" />
@@ -744,8 +973,8 @@ export default function LoginScreen() {
                                                 style={{
                                                     color: "#FFFFFF",
                                                     textAlign: "center",
-                                                    fontSize: 18,
-                                                    fontWeight: "600",
+                                                    fontSize: 17,
+                                                    fontWeight: "700",
                                                 }}
                                             >
                                                 Giriş Yap
@@ -755,25 +984,38 @@ export default function LoginScreen() {
                                 </>
                             )}
 
-                            {/* Sign Up Link */}
+                            {/* Sign Up Section */}
                             <View
                                 style={{
-                                    flexDirection: "row",
-                                    alignItems: "center",
-                                    justifyContent: "center",
                                     marginTop: "auto",
-                                    paddingTop: 32,
+                                    paddingBottom: 28,
+                                    alignItems: "center",
                                 }}
                             >
-                                <Text style={{ color: COLORS.gray }}>Hesabınız yok mu? </Text>
-                                <TouchableOpacity
-                                    onPress={() => router.push("/(auth)/register")}
-                                    disabled={isLoading}
+                                <View
+                                    style={{
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                    }}
                                 >
-                                    <Text style={{ color: COLORS.primary, fontWeight: "600" }}>
-                                        Kayıt Ol
+                                    <Text style={{ color: COLORS.gray, fontSize: 15 }}>
+                                        Hesabınız yok mu?{" "}
                                     </Text>
-                                </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => router.push("/(auth)/register")}
+                                        disabled={isLoading}
+                                    >
+                                        <Text
+                                            style={{
+                                                color: COLORS.primary,
+                                                fontWeight: "700",
+                                                fontSize: 15,
+                                            }}
+                                        >
+                                            Hemen Kayıt Ol
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </View>
                     </ScrollView>

@@ -18,12 +18,14 @@
       "autoIncrement": true,
       "supportsTablet": true,
       "bundleIdentifier": "com.deniz.market",
+      "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "splash": {
         "image": "./assets/images/splash-bg.png",
         "resizeMode": "cover",
         "backgroundColor": "#87EEAB"
-      }
+      },
+      "appleTeamId": "WH5AK4W36G"
     },
     "android": {
       "buildType": "app-bundle",
@@ -57,7 +59,8 @@
       ],
       "expo-router",
       "expo-splash-screen",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,5 +1,6 @@
+// app/order-confirmation.tsx
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,7 +26,7 @@ export default function OrderConfirmationScreen() {
     } = useAddressStore();
     const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash');
-    const [selectedDeliveryTime, setSelectedDeliveryTime] = useState('');
+    const [deliveryNote, setDeliveryNote] = useState('');
     const [loading, setLoading] = useState(false);
 
     const subtotal = getTotal();
@@ -58,10 +59,7 @@ export default function OrderConfirmationScreen() {
             return;
         }
 
-        if (!selectedDeliveryTime) {
-            Alert.alert('Teslimat Saati', 'Lütfen teslimat saati seçin.');
-            return;
-        }
+        if (loading) return;
 
         setLoading(true);
         try {
@@ -79,7 +77,7 @@ export default function OrderConfirmationScreen() {
                         discount_amount: 0,
                         payment_method: selectedPaymentMethod,
                         delivery_address: selectedAddress,
-                        delivery_time: selectedDeliveryTime,
+                        delivery_note: deliveryNote.trim() || null,
                     },
                 ])
                 .select()
@@ -113,233 +111,341 @@ export default function OrderConfirmationScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
-            {/* Header */}
-            <View className="bg-white px-4 py-4 flex-row items-center border-b border-gray-200">
-                <TouchableOpacity onPress={() => router.back()} className="mr-3">
-                    <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
-                </TouchableOpacity>
-                <Text className="text-xl font-bold flex-1" style={{ color: COLORS.dark }}>
-                    Sipariş Onayı
-                </Text>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-                {/* Delivery Address */}
-                <View className="bg-white px-4 py-4 mb-2">
-                    <View className="flex-row items-center justify-between mb-3">
-                        <Text className="text-lg font-bold" style={{ color: COLORS.dark }}>
-                            Teslimat Adresi
-                        </Text>
-                        <TouchableOpacity
-                            onPress={() => router.push('/addresses')}
-                            className="flex-row items-center"
-                        >
-                            <Text style={{ color: COLORS.primary }} className="font-semibold mr-1">
-                                Değiştir
-                            </Text>
-                            <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
-                        </TouchableOpacity>
-                    </View>
-
-                    {selectedAddress ? (
-                        <View className="bg-gray-50 rounded-2xl p-4">
-                            <View className="flex-row items-start">
-                                <View
-                                    className="w-12 h-12 rounded-xl items-center justify-center mr-3"
-                                    style={{ backgroundColor: COLORS.primary + '20' }}
-                                >
-                                    <Ionicons name="home" size={24} color={COLORS.primary} />
-                                </View>
-                                <View className="flex-1">
-                                    <View className="flex-row items-center mb-1">
-                                        <Text className="text-base font-semibold mr-2" style={{ color: COLORS.dark }}>
-                                            {selectedAddress.title}
-                                        </Text>
-                                        {selectedAddress.is_default && (
-                                            <View className="px-2 py-1 rounded" style={{ backgroundColor: COLORS.primary }}>
-                                                <Text className="text-white text-xs">Varsayılan</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                    <Text className="text-sm mb-1" style={{ color: COLORS.gray }}>
-                                        {user?.full_name}
-                                    </Text>
-                                    <Text className="text-sm mb-1" style={{ color: COLORS.gray }}>
-                                        {user?.phone}
-                                    </Text>
-                                    <Text className="text-sm" style={{ color: COLORS.gray }}>
-                                        {selectedAddress.full_address}, {selectedAddress.district}, {selectedAddress.city}
-                                    </Text>
-                                </View>
-                            </View>
-                        </View>
-                    ) : (
-                        <TouchableOpacity
-                            onPress={() => router.push('/add-address')}
-                            className="bg-gray-50 rounded-2xl p-4 flex-row items-center justify-center"
-                        >
-                            <Ionicons name="add-circle-outline" size={24} color={COLORS.primary} />
-                            <Text className="ml-2 font-semibold" style={{ color: COLORS.primary }}>
-                                Adres Ekle
-                            </Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {/* Delivery Time */}
-                <View className="bg-white px-4 py-4 mb-2">
-                    <Text className="text-lg font-bold mb-3" style={{ color: COLORS.dark }}>
-                        Teslimat Zamanı
-                    </Text>
-
-                    {[
-                        { id: 'asap', label: 'En Kısa Sürede', subtitle: '30-45 dakika' },
-                        { id: 'morning', label: 'Sabah', subtitle: '09:00 - 12:00' },
-                        { id: 'afternoon', label: 'Öğleden Sonra', subtitle: '12:00 - 17:00' },
-                        { id: 'evening', label: 'Akşam', subtitle: '17:00 - 21:00' },
-                    ].map((time) => (
-                        <TouchableOpacity
-                            key={time.id}
-                            onPress={() => setSelectedDeliveryTime(time.id)}
-                            className="flex-row items-center justify-between bg-gray-50 rounded-2xl p-4 mb-2"
-                            style={{
-                                borderWidth: 2,
-                                borderColor: selectedDeliveryTime === time.id ? COLORS.primary : 'transparent',
-                            }}
-                        >
-                            <View className="flex-1">
-                                <Text className="text-base font-semibold mb-1" style={{ color: COLORS.dark }}>
-                                    {time.label}
-                                </Text>
-                                <Text className="text-sm" style={{ color: COLORS.gray }}>
-                                    {time.subtitle}
-                                </Text>
-                            </View>
-                            <View
-                                className="w-6 h-6 rounded-full border-2 items-center justify-center"
-                                style={{
-                                    borderColor: selectedDeliveryTime === time.id ? COLORS.primary : COLORS.gray,
-                                }}
-                            >
-                                {selectedDeliveryTime === time.id && (
-                                    <View className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.primary }} />
-                                )}
-                            </View>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {/* Payment Method */}
-                <View className="bg-white px-4 py-4 mb-2">
-                    <Text className="text-lg font-bold mb-3" style={{ color: COLORS.dark }}>
-                        Ödeme Yöntemi
-                    </Text>
-
-                    {PAYMENT_METHODS.map((method) => (
-                        <TouchableOpacity
-                            key={method.id}
-                            onPress={() => setSelectedPaymentMethod(method.id)}
-                            className="flex-row items-center justify-between bg-gray-50 rounded-2xl p-4 mb-2"
-                            style={{
-                                borderWidth: 2,
-                                borderColor: selectedPaymentMethod === method.id ? COLORS.primary : 'transparent',
-                            }}
-                        >
-                            <View className="flex-row items-center flex-1">
-                                <View
-                                    className="w-12 h-12 rounded-xl items-center justify-center mr-3"
-                                    style={{ backgroundColor: COLORS.primary + '20' }}
-                                >
-                                    <Ionicons name={method.icon as any} size={24} color={COLORS.primary} />
-                                </View>
-                                <Text className="text-base font-semibold" style={{ color: COLORS.dark }}>
-                                    {method.label}
-                                </Text>
-                            </View>
-                            <View
-                                className="w-6 h-6 rounded-full border-2 items-center justify-center"
-                                style={{
-                                    borderColor: selectedPaymentMethod === method.id ? COLORS.primary : COLORS.gray,
-                                }}
-                            >
-                                {selectedPaymentMethod === method.id && (
-                                    <View className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.primary }} />
-                                )}
-                            </View>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-
-                {/* Order Summary */}
-                <View className="bg-white px-4 py-4 mb-2">
-                    <Text className="text-lg font-bold mb-3" style={{ color: COLORS.dark }}>
-                        Sipariş Özeti
-                    </Text>
-
-                    <View className="flex-row justify-between mb-2">
-                        <Text style={{ color: COLORS.gray }}>Ürünler ({items.length})</Text>
-                        <Text className="font-semibold" style={{ color: COLORS.dark }}>
-                            ₺{subtotal.toFixed(2)}
-                        </Text>
-                    </View>
-
-                    <View className="flex-row justify-between mb-3 pb-3 border-b border-gray-200">
-                        <Text style={{ color: COLORS.gray }}>Teslimat Ücreti</Text>
-                        <Text
-                            className="font-semibold"
-                            style={{ color: deliveryFee === 0 ? COLORS.primary : COLORS.dark }}
-                        >
-                            {deliveryFee === 0 ? 'ÜCRETSİZ' : `₺${deliveryFee.toFixed(2)}`}
-                        </Text>
-                    </View>
-
-                    <View className="flex-row justify-between">
-                        <Text className="text-lg font-bold" style={{ color: COLORS.dark }}>
-                            Toplam
-                        </Text>
-                        <Text className="text-xl font-bold" style={{ color: COLORS.primary }}>
-                            ₺{total.toFixed(2)}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Info Box */}
-                <View className="mx-4 mb-4 bg-blue-50 rounded-2xl p-4 border border-blue-200">
-                    <View className="flex-row">
-                        <Ionicons name="information-circle" size={24} color={COLORS.info} />
-                        <Text className="flex-1 ml-3 text-sm" style={{ color: COLORS.dark }}>
-                            Siparişiniz onaylandıktan sonra kapıda ödeme yapabilirsiniz. Teslimat süresi yaklaşık 30-45 dakikadır.
-                        </Text>
-                    </View>
-                </View>
-            </ScrollView>
-
-            {/* Place Order Button */}
-            <View
-                className="px-4 py-4 bg-white border-t border-gray-200"
-                style={{
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: -2 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 8,
-                    elevation: 8,
-                }}
+        <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
-                <TouchableOpacity
-                    onPress={handlePlaceOrder}
-                    disabled={loading || !selectedAddress}
-                    className="rounded-xl py-4"
+                {/* Header */}
+                <View
                     style={{
-                        backgroundColor: COLORS.primary,
-                        opacity: loading || !selectedAddress ? 0.5 : 1,
+                        backgroundColor: '#fff',
+                        paddingHorizontal: 16,
+                        paddingVertical: 16,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#E5E5E5'
                     }}
                 >
-                    <Text className="text-white text-center text-lg font-semibold">
-                        {loading ? 'Sipariş Oluşturuluyor...' : `Siparişi Onayla (₺${total.toFixed(2)})`}
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        style={{ marginRight: 12 }}
+                    >
+                        <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
+                    </TouchableOpacity>
+                    <Text style={{ fontSize: 20, fontWeight: '700', flex: 1, color: COLORS.dark }}>
+                        Sipariş Onayı
                     </Text>
-                </TouchableOpacity>
-            </View>
+                </View>
+
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    style={{ flex: 1 }}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {/* Delivery Address */}
+                    <View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 16, marginBottom: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                            <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.dark }}>
+                                Teslimat Adresi
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => router.push('/addresses')}
+                                style={{ flexDirection: 'row', alignItems: 'center' }}
+                            >
+                                <Text style={{ color: COLORS.primary, fontWeight: '600', marginRight: 4 }}>
+                                    Değiştir
+                                </Text>
+                                <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {selectedAddress ? (
+                            <View style={{ backgroundColor: '#F8F9FA', borderRadius: 16, padding: 16 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                                    <View
+                                        style={{
+                                            width: 48,
+                                            height: 48,
+                                            borderRadius: 12,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            marginRight: 12,
+                                            backgroundColor: COLORS.primary + '20'
+                                        }}
+                                    >
+                                        <Ionicons name="home" size={24} color={COLORS.primary} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                            <Text style={{ fontSize: 16, fontWeight: '600', marginRight: 8, color: COLORS.dark }}>
+                                                {selectedAddress.title}
+                                            </Text>
+                                            {selectedAddress.is_default && (
+                                                <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, backgroundColor: COLORS.primary }}>
+                                                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>Varsayılan</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                        <Text style={{ fontSize: 14, color: COLORS.gray, marginBottom: 2 }}>
+                                            {user?.full_name}
+                                        </Text>
+                                        <Text style={{ fontSize: 14, color: COLORS.gray, marginBottom: 2 }}>
+                                            {user?.phone}
+                                        </Text>
+                                        <Text style={{ fontSize: 14, color: COLORS.gray }}>
+                                            {selectedAddress.full_address}, {selectedAddress.district}, {selectedAddress.city}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        ) : (
+                            <TouchableOpacity
+                                onPress={() => router.push('/add-address')}
+                                style={{
+                                    backgroundColor: '#F8F9FA',
+                                    borderRadius: 16,
+                                    padding: 16,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                <Ionicons name="add-circle-outline" size={24} color={COLORS.primary} />
+                                <Text style={{ marginLeft: 8, fontWeight: '600', color: COLORS.primary }}>
+                                    Adres Ekle
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+
+                    {/* Delivery Note */}
+                    <View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 16, marginBottom: 8 }}>
+                        <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.dark, marginBottom: 12 }}>
+                            Teslimat Notu
+                        </Text>
+                        <Text style={{ fontSize: 13, color: COLORS.gray, marginBottom: 12 }}>
+                            Kurye için özel talimatlarınızı yazabilirsiniz (opsiyonel)
+                        </Text>
+                        <View
+                            style={{
+                                backgroundColor: '#F8F9FA',
+                                borderRadius: 16,
+                                borderWidth: 1,
+                                borderColor: '#E5E5E5',
+                            }}
+                        >
+                            <TextInput
+                                placeholder="Örn: Kapıda bırakın, zili çalmayın, 3. kat..."
+                                placeholderTextColor={COLORS.gray}
+                                value={deliveryNote}
+                                onChangeText={setDeliveryNote}
+                                multiline
+                                numberOfLines={4}
+                                maxLength={500}
+                                style={{
+                                    padding: 16,
+                                    fontSize: 15,
+                                    color: COLORS.dark,
+                                    minHeight: 100,
+                                    textAlignVertical: 'top',
+                                }}
+                            />
+                        </View>
+                        <Text style={{ fontSize: 12, color: COLORS.gray, marginTop: 8, textAlign: 'right' }}>
+                            {deliveryNote.length}/500
+                        </Text>
+                    </View>
+
+                    {/* Payment Method */}
+                    <View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 16, marginBottom: 8 }}>
+                        <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.dark, marginBottom: 12 }}>
+                            Ödeme Yöntemi
+                        </Text>
+
+                        {PAYMENT_METHODS.map((method) => {
+                            const isSelected = selectedPaymentMethod === method.id;
+                            return (
+                                <TouchableOpacity
+                                    key={method.id}
+                                    onPress={() => setSelectedPaymentMethod(method.id)}
+                                    activeOpacity={0.7}
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        backgroundColor: '#F8F9FA',
+                                        borderRadius: 16,
+                                        padding: 16,
+                                        marginBottom: 8,
+                                        borderWidth: 2,
+                                        borderColor: isSelected ? COLORS.primary : 'transparent',
+                                    }}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                        <View
+                                            style={{
+                                                width: 48,
+                                                height: 48,
+                                                borderRadius: 12,
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                marginRight: 12,
+                                                backgroundColor: isSelected ? COLORS.primary + '20' : '#E5E5E5'
+                                            }}
+                                        >
+                                            <Ionicons
+                                                name={method.icon as any}
+                                                size={24}
+                                                color={isSelected ? COLORS.primary : COLORS.gray}
+                                            />
+                                        </View>
+                                        <Text
+                                            style={{
+                                                fontSize: 16,
+                                                fontWeight: '600',
+                                                color: COLORS.dark
+                                            }}
+                                        >
+                                            {method.label}
+                                        </Text>
+                                    </View>
+                                    <View
+                                        style={{
+                                            width: 24,
+                                            height: 24,
+                                            borderRadius: 12,
+                                            borderWidth: 2,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            borderColor: isSelected ? COLORS.primary : COLORS.gray,
+                                        }}
+                                    >
+                                        {isSelected && (
+                                            <View
+                                                style={{
+                                                    width: 12,
+                                                    height: 12,
+                                                    borderRadius: 6,
+                                                    backgroundColor: COLORS.primary
+                                                }}
+                                            />
+                                        )}
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+
+                    {/* Order Summary */}
+                    <View style={{ backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 16, marginBottom: 8 }}>
+                        <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.dark, marginBottom: 12 }}>
+                            Sipariş Özeti
+                        </Text>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <Text style={{ color: COLORS.gray, fontSize: 15 }}>Ürünler ({items.length})</Text>
+                            <Text style={{ fontWeight: '600', color: COLORS.dark, fontSize: 15 }}>
+                                ₺{subtotal.toFixed(2)}
+                            </Text>
+                        </View>
+
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                marginBottom: 12,
+                                paddingBottom: 12,
+                                borderBottomWidth: 1,
+                                borderBottomColor: '#E5E5E5'
+                            }}
+                        >
+                            <Text style={{ color: COLORS.gray, fontSize: 15 }}>Teslimat Ücreti</Text>
+                            <Text
+                                style={{
+                                    fontWeight: '600',
+                                    color: deliveryFee === 0 ? COLORS.primary : COLORS.dark,
+                                    fontSize: 15
+                                }}
+                            >
+                                {deliveryFee === 0 ? 'ÜCRETSİZ' : `₺${deliveryFee.toFixed(2)}`}
+                            </Text>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.dark }}>
+                                Toplam
+                            </Text>
+                            <Text style={{ fontSize: 20, fontWeight: '700', color: COLORS.primary }}>
+                                ₺{total.toFixed(2)}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Info Box */}
+                    <View
+                        style={{
+                            marginHorizontal: 16,
+                            marginBottom: 16,
+                            backgroundColor: '#EBF5FF',
+                            borderRadius: 16,
+                            padding: 16,
+                            borderWidth: 1,
+                            borderColor: '#BFDBFE'
+                        }}
+                    >
+                        <View style={{ flexDirection: 'row' }}>
+                            <Ionicons name="information-circle" size={24} color={COLORS.info} />
+                            <Text style={{ flex: 1, marginLeft: 12, fontSize: 14, color: COLORS.dark, lineHeight: 20 }}>
+                                Siparişiniz onaylandıktan sonra kapıda ödeme yapabilirsiniz. Teslimat süresi yaklaşık 30-45 dakikadır.
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Bottom spacing */}
+                    <View style={{ height: 20 }} />
+                </ScrollView>
+
+                {/* Place Order Button */}
+                <View
+                    style={{
+                        paddingHorizontal: 16,
+                        paddingVertical: 16,
+                        backgroundColor: '#fff',
+                        borderTopWidth: 1,
+                        borderTopColor: '#E5E5E5',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: -2 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 8,
+                        elevation: 8,
+                    }}
+                >
+                    <TouchableOpacity
+                        onPress={handlePlaceOrder}
+                        disabled={loading || !selectedAddress}
+                        activeOpacity={0.8}
+                        style={{
+                            borderRadius: 14,
+                            paddingVertical: 16,
+                            backgroundColor: (!selectedAddress) ? '#CCCCCC' : COLORS.primary,
+                        }}
+                    >
+                        {loading ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                                <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>
+                                    Sipariş Oluşturuluyor...
+                                </Text>
+                            </View>
+                        ) : (
+                            <Text style={{ color: '#fff', textAlign: 'center', fontSize: 17, fontWeight: '600' }}>
+                                Siparişi Onayla (₺{total.toFixed(2)})
+                            </Text>
+                        )}
+                    </TouchableOpacity>
+                </View>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }

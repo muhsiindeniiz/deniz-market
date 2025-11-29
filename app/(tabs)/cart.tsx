@@ -201,7 +201,7 @@ export default function CartScreen() {
 
     if (items.length === 0) {
         return (
-            <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+            <SafeAreaView className="h-screen" style={{ backgroundColor: COLORS.background }}>
                 <View className="bg-white px-4 py-4 border-b border-gray-200">
                     <Text className="text-2xl font-bold" style={{ color: COLORS.dark }}>
                         Sepetim

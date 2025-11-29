@@ -1,6 +1,6 @@
 // components/home/ProductCard.tsx
 import { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, Image, TouchableOpacity, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Product } from '@/lib/types';
@@ -49,9 +49,7 @@ export default function ProductCard({ product, width = 160 }: ProductCardProps) 
         }
     };
 
-    const handleToggleFavorite = async (e: any) => {
-        e.stopPropagation();
-
+    const handleToggleFavorite = async () => {
         if (!isAuthenticated) {
             showToast('Favorilere eklemek için giriş yapın', 'warning');
             router.push('/(auth)/login');
@@ -95,8 +93,7 @@ export default function ProductCard({ product, width = 160 }: ProductCardProps) 
         }
     };
 
-    const handleAddToCart = (e: any) => {
-        e.stopPropagation();
+    const handleAddToCart = () => {
         if (product.stock <= 0) {
             showToast('Bu ürün şu anda stokta yok', 'error');
             return;
@@ -118,160 +115,231 @@ export default function ProductCard({ product, width = 160 }: ProductCardProps) 
     return (
         <TouchableOpacity
             onPress={() => router.push(`/product/${product.id}`)}
-            className="bg-white rounded-2xl overflow-hidden"
-            style={{
-                width,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.05,
-                shadowRadius: 4,
-                elevation: 2,
-            }}
+            style={[styles.card, { width }]}
             activeOpacity={0.7}
         >
-            {/* Discount Badge */}
-            {hasDiscount && (
-                <View
-                    className="absolute top-2 left-2 px-2 py-1 rounded-lg z-10"
-                    style={{ backgroundColor: COLORS.danger }}
-                >
-                    <Text className="text-white text-xs font-bold">
-                        %{discountPercentage} indirim
-                    </Text>
-                </View>
-            )}
-
-            {/* Favorite Button - Pressable kullanıyoruz */}
-            <Pressable
-                onPress={handleToggleFavorite}
-                disabled={favoriteLoading}
-                style={({ pressed }) => [
-                    {
-                        position: 'absolute',
-                        top: 8,
-                        right: 8,
-                        width: 32,
-                        height: 32,
-                        borderRadius: 16,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: COLORS.white,
-                        zIndex: 10,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.2,
-                        shadowRadius: 2,
-                        elevation: 3,
-                        transform: [{ scale: pressed ? 0.9 : 1 }], // Basınca küçülsün
-                    },
-                ]}
-            >
-                {favoriteLoading ? (
-                    <ActivityIndicator size="small" color={COLORS.danger} />
-                ) : (
-                    <Ionicons
-                        name={isFavorite ? 'heart' : 'heart-outline'}
-                        size={18}
-                        color={isFavorite ? COLORS.danger : COLORS.gray}
-                    />
-                )}
-            </Pressable>
-
-            {/* Stock Badge */}
-            {product.stock <= 0 && (
-                <View
-                    className="absolute top-2 left-2 px-2 py-1 rounded-lg z-10"
-                    style={{ backgroundColor: COLORS.gray }}
-                >
-                    <Text className="text-white text-xs font-bold">
-                        Tükendi
-                    </Text>
-                </View>
-            )}
-
-            {/* Product Image */}
-            <View className="w-full h-40 bg-gray-100">
+            {/* Image Section */}
+            <View style={styles.imageContainer}>
                 {imageUrl ? (
                     <Image
                         source={{ uri: imageUrl }}
-                        className="w-full h-full"
+                        style={styles.image}
                         resizeMode="cover"
                     />
                 ) : (
-                    <View className="w-full h-full items-center justify-center">
+                    <View style={styles.imagePlaceholder}>
                         <Ionicons name="image-outline" size={40} color={COLORS.gray} />
                     </View>
                 )}
+
+                {/* Discount Badge - Sol üst */}
+                {hasDiscount && product.stock > 0 && (
+                    <View style={styles.discountBadge}>
+                        <Text style={styles.discountText}>%{discountPercentage}</Text>
+                    </View>
+                )}
+
+                {/* Stock Badge - Sol üst */}
+                {product.stock <= 0 && (
+                    <View style={styles.stockBadge}>
+                        <Text style={styles.stockText}>Tükendi</Text>
+                    </View>
+                )}
+
+                {/* Favorite Button - Sağ üst */}
+                <TouchableOpacity
+                    onPress={handleToggleFavorite}
+                    disabled={favoriteLoading}
+                    style={styles.favoriteButton}
+                    activeOpacity={0.7}
+                >
+                    {favoriteLoading ? (
+                        <ActivityIndicator size="small" color={COLORS.danger} />
+                    ) : (
+                        <Ionicons
+                            name={isFavorite ? 'heart' : 'heart-outline'}
+                            size={18}
+                            color={isFavorite ? COLORS.danger : COLORS.gray}
+                        />
+                    )}
+                </TouchableOpacity>
             </View>
 
-            <View className="p-3">
+            {/* Content Section */}
+            <View style={styles.content}>
                 {/* Store Name */}
                 {product.store && (
-                    <Text
-                        className="text-xs mb-1"
-                        style={{ color: COLORS.primary }}
-                        numberOfLines={1}
-                    >
+                    <Text style={styles.storeName} numberOfLines={1}>
                         {product.store.name}
                     </Text>
                 )}
 
                 {/* Product Name */}
-                <Text
-                    className="text-sm font-semibold mb-1"
-                    style={{ color: COLORS.dark }}
-                    numberOfLines={2}
-                >
+                <Text style={styles.productName} numberOfLines={2}>
                     {product.name}
                 </Text>
 
                 {/* Weight/Unit */}
                 {product.weight && (
-                    <Text className="text-xs mb-1" style={{ color: COLORS.gray }}>
-                        {product.weight}
-                    </Text>
+                    <Text style={styles.weight}>{product.weight}</Text>
                 )}
 
                 {/* Rating */}
-                <View className="flex-row items-center mb-2">
-                    <Ionicons name="star" size={14} color={COLORS.warning} />
-                    <Text className="text-xs ml-1" style={{ color: COLORS.gray }}>
+                <View style={styles.ratingContainer}>
+                    <Ionicons name="star" size={12} color={COLORS.warning} />
+                    <Text style={styles.ratingText}>
                         {product.rating.toFixed(1)} ({product.review_count})
                     </Text>
                 </View>
 
                 {/* Price and Add Button */}
-                <View className="flex-row items-center justify-between">
+                <View style={styles.priceRow}>
                     <View>
-                        <Text
-                            className="text-lg font-bold"
-                            style={{ color: COLORS.primary }}
-                        >
-                            ₺{price.toFixed(2)}
-                        </Text>
+                        <Text style={styles.price}>₺{price.toFixed(2)}</Text>
                         {hasDiscount && (
-                            <Text
-                                className="text-xs line-through"
-                                style={{ color: COLORS.gray }}
-                            >
-                                ₺{product.price.toFixed(2)}
-                            </Text>
+                            <Text style={styles.oldPrice}>₺{product.price.toFixed(2)}</Text>
                         )}
                     </View>
 
                     <TouchableOpacity
                         onPress={handleAddToCart}
-                        className="w-9 h-9 rounded-xl items-center justify-center"
-                        style={{
-                            backgroundColor: product.stock > 0 ? COLORS.primary : COLORS.gray,
-                        }}
+                        style={[
+                            styles.addButton,
+                            { backgroundColor: product.stock > 0 ? COLORS.primary : COLORS.gray }
+                        ]}
                         disabled={product.stock <= 0}
                         activeOpacity={0.7}
                     >
-                        <Ionicons name="add" size={22} color={COLORS.white} />
+                        <Ionicons name="add" size={22} color="#fff" />
                     </TouchableOpacity>
                 </View>
             </View>
         </TouchableOpacity>
     );
 }
+
+const styles = StyleSheet.create({
+    card: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    imageContainer: {
+        width: '100%',
+        height: 140,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        overflow: 'hidden',
+        backgroundColor: '#F5F5F5',
+    },
+    image: {
+        width: '100%',
+        height: '100%',
+    },
+    imagePlaceholder: {
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    discountBadge: {
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        backgroundColor: COLORS.danger,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    discountText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    stockBadge: {
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        backgroundColor: COLORS.gray,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    stockText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    favoriteButton: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+    content: {
+        padding: 12,
+    },
+    storeName: {
+        fontSize: 11,
+        color: COLORS.primary,
+        marginBottom: 2,
+    },
+    productName: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: COLORS.dark,
+        marginBottom: 2,
+        lineHeight: 18,
+    },
+    weight: {
+        fontSize: 11,
+        color: COLORS.gray,
+        marginBottom: 4,
+    },
+    ratingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    ratingText: {
+        fontSize: 11,
+        color: COLORS.gray,
+        marginLeft: 4,
+    },
+    priceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    price: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: COLORS.primary,
+    },
+    oldPrice: {
+        fontSize: 11,
+        color: COLORS.gray,
+        textDecorationLine: 'line-through',
+    },
+    addButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+});

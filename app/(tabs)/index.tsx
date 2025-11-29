@@ -128,7 +128,7 @@ export default function HomeScreen() {
     }
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+        <SafeAreaView style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-3 border-b border-gray-100">
                 <View className="flex-row items-center justify-between">
