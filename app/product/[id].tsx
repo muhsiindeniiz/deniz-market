@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+// app/(screens)/product/[id].tsx
+import { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,9 +9,48 @@ import { Product, Review } from '@/lib/types';
 import { useCartStore } from '@/store/cartStore';
 import { useToast } from '@/hooks/useToast';
 import { COLORS } from '@/lib/constants';
-import { ProductDetailSkeleton } from '@/components/ui/Loading';
 
 const { width } = Dimensions.get('window');
+const DESCRIPTION_LINES = 3;
+
+// Skeleton Component
+const ProductDetailSkeleton = () => (
+    <ScrollView className="flex-1">
+        {/* Image Skeleton */}
+        <View style={{ width, height: width, backgroundColor: COLORS.gray + '30' }} />
+
+        <View className="p-4">
+            {/* Title Skeleton */}
+            <View style={{ width: '80%', height: 28, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 12 }} />
+
+            {/* Rating Skeleton */}
+            <View style={{ width: '50%', height: 20, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 16 }} />
+
+            {/* Store Info Skeleton */}
+            <View className="flex-row items-center mb-4 pb-4 border-b border-gray-200">
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.gray + '30', marginRight: 12 }} />
+                <View className="flex-1">
+                    <View style={{ width: '60%', height: 16, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 8 }} />
+                    <View style={{ width: '40%', height: 14, backgroundColor: COLORS.gray + '30', borderRadius: 4 }} />
+                </View>
+            </View>
+
+            {/* Description Skeleton */}
+            <View style={{ width: '40%', height: 20, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 12 }} />
+            <View style={{ width: '100%', height: 16, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 8 }} />
+            <View style={{ width: '100%', height: 16, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 8 }} />
+            <View style={{ width: '70%', height: 16, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 16 }} />
+
+            {/* Details Box Skeleton */}
+            <View className="bg-gray-50 rounded-2xl p-4 mb-4">
+                <View style={{ width: '50%', height: 20, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 12 }} />
+                <View style={{ width: '100%', height: 16, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 8 }} />
+                <View style={{ width: '100%', height: 16, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 8 }} />
+                <View style={{ width: '100%', height: 16, backgroundColor: COLORS.gray + '30', borderRadius: 4 }} />
+            </View>
+        </View>
+    </ScrollView>
+);
 
 export default function ProductDetailScreen() {
     const router = useRouter();
@@ -24,33 +64,115 @@ export default function ProductDetailScreen() {
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const [isFavorite, setIsFavorite] = useState(false);
     const [showFullDescription, setShowFullDescription] = useState(false);
+    const [shouldShowReadMore, setShouldShowReadMore] = useState(false);
 
     useEffect(() => {
         loadProductData();
     }, [id]);
 
+    // app/(screens)/product/[id].tsx
     const loadProductData = async () => {
         try {
-            // Load product
-            const { data: productData } = await supabase
+            setLoading(true);
+
+            console.log('Loading product with ID:', id);
+
+            const { data: productData, error: productError } = await supabase
                 .from('products')
-                .select('*, category:categories(*)')
+                .select(`
+                id,
+                name,
+                description,
+                price,
+                discount_price,
+                category_id,
+                store_id,
+                images,
+                stock,
+                unit,
+                weight,
+                rating,
+                review_count,
+                is_featured,
+                is_on_sale,
+                created_at,
+                updated_at,
+                category:categories (
+                    id,
+                    name,
+                    icon,
+                    image_url,
+                    color,
+                    item_count,
+                    created_at
+                ),
+                store:stores (
+                    id,
+                    name,
+                    description,
+                    logo,
+                    banner_image,
+                    address,
+                    phone,
+                    email,
+                    rating,
+                    review_count,
+                    is_active,
+                    created_at,
+                    updated_at
+                )
+            `)
                 .eq('id', id)
                 .single();
 
-            if (productData) setProduct(productData);
+            if (productError) {
+                console.error('Product error:', productError);
+                throw productError;
+            }
 
-            // Load reviews
+            console.log('Product data loaded:', productData);
+
+            if (productData) {
+                const formattedProduct: Product = {
+                    ...productData,
+                    category: Array.isArray(productData.category) ? productData.category[0] : productData.category,
+                    store: Array.isArray(productData.store) ? productData.store[0] : productData.store,
+                };
+                setProduct(formattedProduct);
+            }
+
             const { data: reviewsData } = await supabase
                 .from('reviews')
-                .select('*, user:users(*)')
+                .select(`
+                id,
+                product_id,
+                user_id,
+                rating,
+                comment,
+                created_at,
+                user:users (
+                    id,
+                    email,
+                    full_name,
+                    phone,
+                    created_at,
+                    updated_at
+                )
+            `)
                 .eq('product_id', id)
                 .order('created_at', { ascending: false })
                 .limit(3);
 
-            if (reviewsData) setReviews(reviewsData);
+            if (reviewsData) {
+                const formattedReviews: Review[] = reviewsData.map(review => ({
+                    ...review,
+                    user: Array.isArray(review.user) ? review.user[0] : review.user,
+                }));
+                setReviews(formattedReviews);
+            }
         } catch (error) {
             console.error('Error loading product:', error);
+            showToast('Ürün yüklenirken hata oluştu', 'error');
         } finally {
             setLoading(false);
         }
@@ -68,9 +190,15 @@ export default function ProductDetailScreen() {
         router.push('/cart');
     };
 
+    const handleStorePress = () => {
+        if (product?.store?.id) {
+            router.push(`/store/${product.store.id}`);
+        }
+    };
+
     if (loading) {
         return (
-            <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.white }}>
+            <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.white }}>
                 <View className="px-4 py-3 flex-row items-center justify-between border-b border-gray-200">
                     <TouchableOpacity onPress={() => router.back()}>
                         <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
@@ -89,17 +217,45 @@ export default function ProductDetailScreen() {
 
     if (!product) {
         return (
-            <View className="flex-1 items-center justify-center" style={{ backgroundColor: COLORS.background }}>
-                <Text>Ürün bulunamadı</Text>
-            </View>
+            <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
+                <View className="px-4 py-3 flex-row items-center justify-between border-b border-gray-200">
+                    <TouchableOpacity onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
+                    </TouchableOpacity>
+                    <Text className="text-lg font-semibold" style={{ color: COLORS.dark }}>
+                        Ürün Detayı
+                    </Text>
+                    <TouchableOpacity onPress={() => router.push('/cart')}>
+                        <Ionicons name="cart-outline" size={24} color={COLORS.dark} />
+                    </TouchableOpacity>
+                </View>
+                <View className="flex-1 items-center justify-center">
+                    <Ionicons name="alert-circle-outline" size={64} color={COLORS.gray} />
+                    <Text className="text-xl font-bold mt-4" style={{ color: COLORS.dark }}>
+                        Ürün Bulunamadı
+                    </Text>
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        className="mt-6 px-6 py-3 rounded-xl"
+                        style={{ backgroundColor: COLORS.primary }}
+                    >
+                        <Text className="text-white font-semibold">Geri Dön</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
         );
     }
 
     const price = product.discount_price || product.price;
     const hasDiscount = product.discount_price && product.discount_price < product.price;
+    const isMinQuantity = quantity <= 1;
+    const isMaxQuantity = quantity >= product.stock;
+
+    console.log('Rendering product:', product.name);
+    console.log('Store data:', product.store);
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.white }}>
+        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.white }}>
             {/* Header */}
             <View className="px-4 py-3 flex-row items-center justify-between border-b border-gray-200">
                 <TouchableOpacity onPress={() => router.back()}>
@@ -139,18 +295,20 @@ export default function ProductDetailScreen() {
                     </ScrollView>
 
                     {/* Image Indicators */}
-                    <View className="absolute bottom-4 left-0 right-0 flex-row justify-center">
-                        {product.images.map((_, index) => (
-                            <View
-                                key={index}
-                                className="h-2 rounded-full mx-1"
-                                style={{
-                                    width: selectedImageIndex === index ? 24 : 8,
-                                    backgroundColor: selectedImageIndex === index ? COLORS.primary : COLORS.white + '60',
-                                }}
-                            />
-                        ))}
-                    </View>
+                    {product.images.length > 1 && (
+                        <View className="absolute bottom-4 left-0 right-0 flex-row justify-center">
+                            {product.images.map((_, index) => (
+                                <View
+                                    key={index}
+                                    className="h-2 rounded-full mx-1"
+                                    style={{
+                                        width: selectedImageIndex === index ? 24 : 8,
+                                        backgroundColor: selectedImageIndex === index ? COLORS.primary : COLORS.white + '60',
+                                    }}
+                                />
+                            ))}
+                        </View>
+                    )}
 
                     {/* Favorite Button */}
                     <TouchableOpacity
@@ -194,24 +352,53 @@ export default function ProductDetailScreen() {
                         </View>
                     </View>
 
-                    {/* Seller Info */}
-                    <TouchableOpacity className="flex-row items-center mb-4 pb-4 border-b border-gray-200">
-                        <View
-                            className="w-12 h-12 rounded-full items-center justify-center mr-3"
-                            style={{ backgroundColor: COLORS.primary + '20' }}
+                    {/* Store Info - DÜZELTME */}
+                    {product.store && (
+                        <TouchableOpacity
+                            onPress={handleStorePress}
+                            className="flex-row items-center mb-4 pb-4 border-b border-gray-200"
+                            activeOpacity={0.7}
                         >
-                            <Ionicons name="storefront" size={24} color={COLORS.primary} />
+                            <View
+                                className="w-12 h-12 rounded-full items-center justify-center mr-3 overflow-hidden"
+                                style={{ backgroundColor: COLORS.primary + '20' }}
+                            >
+                                {product.store.logo ? (
+                                    <Image
+                                        source={{ uri: product.store.logo }}
+                                        style={{ width: 48, height: 48 }}
+                                        resizeMode="cover"
+                                    />
+                                ) : (
+                                    <Ionicons name="storefront" size={24} color={COLORS.primary} />
+                                )}
+                            </View>
+                            <View className="flex-1">
+                                <Text className="text-base font-semibold mb-1" style={{ color: COLORS.dark }}>
+                                    {product.store.name}
+                                </Text>
+                                <View className="flex-row items-center">
+                                    <Ionicons name="star" size={14} color={COLORS.warning} />
+                                    <Text className="text-sm ml-1" style={{ color: COLORS.gray }}>
+                                        {product.store.rating?.toFixed(1) || '5.0'} ({product.store.review_count || 0} değerlendirme)
+                                    </Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+                        </TouchableOpacity>
+                    )}
+
+                    {/* Eğer store yoksa gösterelim (debug için) */}
+                    {!product.store && (
+                        <View className="bg-yellow-50 rounded-2xl p-4 mb-4 border border-yellow-200">
+                            <View className="flex-row items-center">
+                                <Ionicons name="warning" size={20} color={COLORS.warning} />
+                                <Text className="ml-2 text-sm" style={{ color: COLORS.dark }}>
+                                    Bu ürün henüz bir mağazaya atanmamış
+                                </Text>
+                            </View>
                         </View>
-                        <View className="flex-1">
-                            <Text className="text-base font-semibold" style={{ color: COLORS.dark }}>
-                                Deniz Market
-                            </Text>
-                            <Text className="text-sm" style={{ color: COLORS.gray }}>
-                                1.5K Takipçi
-                            </Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-                    </TouchableOpacity>
+                    )}
 
                     {/* Description */}
                     <View className="mb-4">
@@ -221,15 +408,22 @@ export default function ProductDetailScreen() {
                         <Text
                             className="text-base leading-6"
                             style={{ color: COLORS.gray }}
-                            numberOfLines={showFullDescription ? undefined : 3}
+                            numberOfLines={showFullDescription ? undefined : DESCRIPTION_LINES}
+                            onTextLayout={(e) => {
+                                if (e.nativeEvent.lines.length > DESCRIPTION_LINES) {
+                                    setShouldShowReadMore(true);
+                                }
+                            }}
                         >
                             {product.description}
                         </Text>
-                        <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)} className="mt-2">
-                            <Text style={{ color: COLORS.primary }} className="font-semibold">
-                                {showFullDescription ? 'Daha az göster' : 'Devamını oku'}
-                            </Text>
-                        </TouchableOpacity>
+                        {shouldShowReadMore && (
+                            <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)} className="mt-2">
+                                <Text style={{ color: COLORS.primary }} className="font-semibold">
+                                    {showFullDescription ? 'Daha az göster' : 'Devamını oku'}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
 
                     {/* Product Details */}
@@ -238,10 +432,19 @@ export default function ProductDetailScreen() {
                             Ürün Detayları
                         </Text>
 
+                        {product.store && (
+                            <View className="flex-row justify-between mb-2">
+                                <Text style={{ color: COLORS.gray }}>Mağaza</Text>
+                                <Text className="font-medium" style={{ color: COLORS.dark }}>
+                                    {product.store.name}
+                                </Text>
+                            </View>
+                        )}
+
                         <View className="flex-row justify-between mb-2">
                             <Text style={{ color: COLORS.gray }}>Kategori</Text>
                             <Text className="font-medium" style={{ color: COLORS.dark }}>
-                                {product.category?.name}
+                                {product.category?.name || '-'}
                             </Text>
                         </View>
 
@@ -290,7 +493,9 @@ export default function ProductDetailScreen() {
                                             className="w-10 h-10 rounded-full items-center justify-center mr-3"
                                             style={{ backgroundColor: COLORS.primary + '20' }}
                                         >
-                                            <Ionicons name="person" size={20} color={COLORS.primary} />
+                                            <Text className="font-bold" style={{ color: COLORS.primary }}>
+                                                {review.user?.full_name?.charAt(0).toUpperCase() || 'K'}
+                                            </Text>
                                         </View>
                                         <View className="flex-1">
                                             <Text className="font-semibold" style={{ color: COLORS.dark }}>
@@ -318,7 +523,7 @@ export default function ProductDetailScreen() {
 
             {/* Bottom Bar */}
             <View
-                className="px-4 py-4 border-t border-gray-200"
+                className="px-4 py-3 border-t border-gray-200"
                 style={{
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: -2 },
@@ -326,6 +531,7 @@ export default function ProductDetailScreen() {
                     shadowRadius: 8,
                     elevation: 8,
                     backgroundColor: COLORS.white,
+                    paddingBottom: 20,
                 }}
             >
                 <View className="flex-row items-center mb-3">
@@ -347,15 +553,19 @@ export default function ProductDetailScreen() {
 
                     <View className="flex-row items-center bg-gray-100 rounded-xl">
                         <TouchableOpacity
-                            onPress={() => setQuantity(Math.max(1, quantity - 1))}
-                            disabled={quantity <= 1}
+                            onPress={() => {
+                                if (!isMinQuantity) {
+                                    setQuantity(quantity - 1);
+                                }
+                            }}
+                            disabled={isMinQuantity}
                             className="w-10 h-10 items-center justify-center"
                             activeOpacity={0.7}
                         >
                             <Ionicons
                                 name="remove"
                                 size={20}
-                                color={quantity <= 1 ? COLORS.gray : COLORS.dark}
+                                color={isMinQuantity ? COLORS.gray + '80' : COLORS.dark}
                             />
                         </TouchableOpacity>
 
@@ -364,15 +574,21 @@ export default function ProductDetailScreen() {
                         </Text>
 
                         <TouchableOpacity
-                            onPress={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                            disabled={quantity >= product.stock}
+                            onPress={() => {
+                                if (!isMaxQuantity) {
+                                    setQuantity(quantity + 1);
+                                } else {
+                                    showToast('Maksimum stok miktarına ulaşıldı', 'warning');
+                                }
+                            }}
+                            disabled={isMaxQuantity}
                             className="w-10 h-10 items-center justify-center"
                             activeOpacity={0.7}
                         >
                             <Ionicons
                                 name="add"
                                 size={20}
-                                color={quantity >= product.stock ? COLORS.gray : COLORS.dark}
+                                color={isMaxQuantity ? COLORS.gray + '80' : COLORS.dark}
                             />
                         </TouchableOpacity>
                     </View>
@@ -382,7 +598,7 @@ export default function ProductDetailScreen() {
                     <TouchableOpacity
                         onPress={handleAddToCart}
                         disabled={product.stock === 0}
-                        className="flex-1 rounded-xl py-4 mr-2 border-2"
+                        className="flex-1 rounded-xl py-3 mr-2 border-2"
                         style={{
                             borderColor: COLORS.primary,
                             opacity: product.stock === 0 ? 0.5 : 1,
@@ -396,7 +612,7 @@ export default function ProductDetailScreen() {
                     <TouchableOpacity
                         onPress={handleBuyNow}
                         disabled={product.stock === 0}
-                        className="flex-1 rounded-xl py-4 ml-2"
+                        className="flex-1 rounded-xl py-3 ml-2"
                         style={{
                             backgroundColor: COLORS.primary,
                             opacity: product.stock === 0 ? 0.5 : 1,

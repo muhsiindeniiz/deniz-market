@@ -5,12 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
+import { useAddressStore } from '@/store/addressStore';
 import { useToast } from '@/hooks/useToast';
 import { COLORS } from '@/lib/constants';
 
 export default function AddAddressScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
+    const { refreshAddresses } = useAddressStore();
     const { showToast } = useToast();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -47,6 +49,11 @@ export default function AddAddressScreen() {
 
             if (error) throw error;
 
+            // Adresleri yeniden yükle
+            if (user?.id) {
+                await refreshAddresses(user.id);
+            }
+
             showToast('Adres başarıyla eklendi', 'success');
             router.back();
         } catch (error: any) {
@@ -57,7 +64,7 @@ export default function AddAddressScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 flex-row items-center border-b border-gray-200">
                 <TouchableOpacity onPress={() => router.back()} className="mr-3">
@@ -74,7 +81,7 @@ export default function AddAddressScreen() {
             >
                 <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
                     <View className="p-4">
-                        {/* Address Title */}
+                        {/* Form fields - aynı kalacak */}
                         <View className="mb-4">
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 Adres Başlığı *
@@ -88,7 +95,6 @@ export default function AddAddressScreen() {
                             />
                         </View>
 
-                        {/* Full Address */}
                         <View className="mb-4">
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 Tam Adres *
@@ -105,7 +111,6 @@ export default function AddAddressScreen() {
                             />
                         </View>
 
-                        {/* City */}
                         <View className="mb-4">
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 Şehir *
@@ -119,7 +124,6 @@ export default function AddAddressScreen() {
                             />
                         </View>
 
-                        {/* District */}
                         <View className="mb-4">
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 İlçe *
@@ -133,7 +137,6 @@ export default function AddAddressScreen() {
                             />
                         </View>
 
-                        {/* Postal Code */}
                         <View className="mb-4">
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 Posta Kodu
@@ -148,7 +151,6 @@ export default function AddAddressScreen() {
                             />
                         </View>
 
-                        {/* Default Address Toggle */}
                         <TouchableOpacity
                             onPress={() => setFormData({ ...formData, is_default: !formData.is_default })}
                             className="bg-white rounded-xl p-4 flex-row items-center justify-between mb-6"
@@ -169,7 +171,6 @@ export default function AddAddressScreen() {
                             </View>
                         </TouchableOpacity>
 
-                        {/* Save Button */}
                         <TouchableOpacity
                             onPress={handleSave}
                             disabled={loading}

@@ -1,11 +1,13 @@
+// app/(tabs)/index.tsx
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, FlatList, Dimensions, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
+import { useAddressStore } from '@/store/addressStore';
 import { Product, Category } from '@/lib/types';
 import { COLORS } from '@/lib/constants';
 import ProductCard from '@/components/home/ProductCard';
@@ -16,7 +18,7 @@ export default function HomeScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
     const itemCount = useCartStore((state) => state.getItemCount());
-    const [selectedAddress, setSelectedAddress] = useState('Adres Seçin');
+    const { selectedAddress, loadAddresses, subscribeToAddresses, unsubscribeFromAddresses } = useAddressStore();
     const [categories, setCategories] = useState<Category[]>([]);
     const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
     const [bestSellingProducts, setBestSellingProducts] = useState<Product[]>([]);
@@ -24,12 +26,22 @@ export default function HomeScreen() {
 
     useEffect(() => {
         loadData();
-        loadDefaultAddress();
-    }, []);
+        if (user?.id) {
+            loadAddresses(user.id);
+            subscribeToAddresses(user.id);
+        }
+
+        return () => {
+            unsubscribeFromAddresses();
+        };
+    }, [user]);
+
+    const displayAddress = selectedAddress
+        ? `${selectedAddress.district}, ${selectedAddress.city}`
+        : 'Adres Seçin';
 
     const loadData = async () => {
         try {
-            // Kategorileri yükle
             const { data: categoriesData } = await supabase
                 .from('categories')
                 .select('*')
@@ -37,19 +49,17 @@ export default function HomeScreen() {
 
             if (categoriesData) setCategories(categoriesData);
 
-            // Öne çıkan ürünleri yükle
             const { data: featuredData } = await supabase
                 .from('products')
-                .select('*, category:categories(*)')
+                .select('*, category:categories(*), store:stores(*)')
                 .eq('is_featured', true)
                 .limit(10);
 
             if (featuredData) setFeaturedProducts(featuredData);
 
-            // Çok satan ürünleri yükle
             const { data: bestSellingData } = await supabase
                 .from('products')
-                .select('*, category:categories(*)')
+                .select('*, category:categories(*), store:stores(*)')
                 .order('created_at', { ascending: false })
                 .limit(10);
 
@@ -59,33 +69,17 @@ export default function HomeScreen() {
         }
     };
 
-    const loadDefaultAddress = async () => {
-        if (!user) return;
-
-        try {
-            const { data } = await supabase
-                .from('addresses')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('is_default', true)
-                .single();
-
-            if (data) {
-                setSelectedAddress(`${data.district}, ${data.city}`);
-            }
-        } catch (error) {
-            console.error('Error loading address:', error);
-        }
-    };
-
     const onRefresh = async () => {
         setRefreshing(true);
         await loadData();
+        if (user?.id) {
+            await loadAddresses(user.id);
+        }
         setRefreshing(false);
     };
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-3 flex-row items-center justify-between border-b border-gray-200">
                 <TouchableOpacity
@@ -98,7 +92,7 @@ export default function HomeScreen() {
                             Teslimat Adresi
                         </Text>
                         <Text className="text-sm font-semibold" style={{ color: COLORS.dark }} numberOfLines={1}>
-                            {selectedAddress}
+                            {displayAddress}
                         </Text>
                     </View>
                     <Ionicons name="chevron-down" size={20} color={COLORS.dark} />
@@ -140,7 +134,7 @@ export default function HomeScreen() {
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
                 }
             >
-                {/* Search Bar */}
+                {/* Geri kalan kodlar aynı */}
                 <View className="px-4 pt-4 pb-2">
                     <TouchableOpacity
                         onPress={() => router.push('/search')}
@@ -153,16 +147,14 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* Promo Carousel */}
                 <PromoCarousel />
 
-                {/* Categories */}
                 <View className="px-4 mt-4">
                     <View className="flex-row items-center justify-between mb-3">
                         <Text className="text-xl font-bold" style={{ color: COLORS.dark }}>
                             Kategoriler
                         </Text>
-                        <TouchableOpacity onPress={() => router.push('/(tabs)/categories')}>
+                        <TouchableOpacity onPress={() => router.push('/categories')}>
                             <Text style={{ color: COLORS.primary }} className="font-semibold">
                                 Hepsini Gör
                             </Text>
@@ -176,7 +168,6 @@ export default function HomeScreen() {
                     </ScrollView>
                 </View>
 
-                {/* Best Selling Products */}
                 <View className="px-4 mt-6">
                     <View className="flex-row items-center justify-between mb-3">
                         <Text className="text-xl font-bold" style={{ color: COLORS.dark }}>
@@ -196,7 +187,6 @@ export default function HomeScreen() {
                     </ScrollView>
                 </View>
 
-                {/* Featured Products */}
                 {featuredProducts.length > 0 && (
                     <View className="px-4 mt-6 mb-6">
                         <View className="flex-row items-center justify-between mb-3">

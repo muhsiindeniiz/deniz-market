@@ -8,12 +8,22 @@
     "scheme": "denizmarket",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-bg.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#87EEAB"
+    },
     "ios": {
       "buildConfiguration": "Release",
       "autoIncrement": true,
       "supportsTablet": true,
       "bundleIdentifier": "com.deniz.market",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "splash": {
+        "image": "./assets/images/splash-bg.png",
+        "resizeMode": "cover",
+        "backgroundColor": "#87EEAB"
+      }
     },
     "android": {
       "buildType": "app-bundle",
@@ -26,7 +36,12 @@
       "package": "com.deniz.market",
       "edgeToEdgeEnabled": true,
       "googleServicesFile": "./google-services.json",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "splash": {
+        "image": "./assets/images/splash-bg.png",
+        "resizeMode": "cover",
+        "backgroundColor": "#87EEAB"
+      }
     },
     "web": {
       "bundler": "metro",
@@ -41,18 +56,7 @@
         }
       ],
       "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
-        }
-      ],
+      "expo-splash-screen",
       "expo-web-browser"
     ],
     "experiments": {

@@ -130,7 +130,7 @@ export default function ForgotPasswordScreen() {
             end={{ x: 0, y: 1 }}
             style={{ flex: 1 }}
         >
-            <SafeAreaView style={{ flex: 1 }}>
+            <SafeAreaView className="flex-1"style={{ flex: 1 }}>
                 <ScrollView
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ flexGrow: 1 }}

@@ -111,7 +111,7 @@ export default function CategoryDetailScreen() {
 
     if (loading) {
         return (
-            <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+            <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
                 <View className="bg-white px-4 py-4 flex-row items-center justify-between border-b border-gray-200">
                     <View className="flex-row items-center flex-1">
                         <TouchableOpacity onPress={() => router.back()} className="mr-3">
@@ -144,7 +144,7 @@ export default function CategoryDetailScreen() {
     }
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 flex-row items-center justify-between border-b border-gray-200">
                 <View className="flex-row items-center flex-1">

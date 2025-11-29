@@ -1,8 +1,25 @@
+// lib/types.ts
 export interface User {
     id: string;
     email: string;
     full_name: string;
     phone: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface Store {
+    id: string;
+    name: string;
+    description: string;
+    logo: string;
+    banner_image: string;
+    address: string;
+    phone: string;
+    email: string;
+    rating: number;
+    review_count: number;
+    is_active: boolean;
     created_at: string;
     updated_at: string;
 }
@@ -23,7 +40,8 @@ export interface Address {
 export interface Category {
     id: string;
     name: string;
-    icon: string;
+    icon?: string; // Eski alan, opsiyonel tutabilirsiniz
+    image_url: string; // Yeni alan - Supabase Storage URL'si
     color: string;
     item_count: number;
     created_at: string;
@@ -37,6 +55,8 @@ export interface Product {
     discount_price?: number;
     category_id: string;
     category?: Category;
+    store_id: string;
+    store?: Store;
     images: string[];
     stock: number;
     unit: string;
@@ -99,4 +119,22 @@ export interface Notification {
     is_read: boolean;
     data?: any;
     created_at: string;
+}
+
+export interface TermsAndConditions {
+    id: string;
+    content: string;
+    version: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PrivacyPolicy {
+    id: string;
+    content: string;
+    version: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
 }

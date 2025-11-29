@@ -107,7 +107,7 @@ export default function SettingsScreen() {
     ];
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 flex-row items-center border-b border-gray-200">
                 <TouchableOpacity onPress={() => router.back()} className="mr-3">

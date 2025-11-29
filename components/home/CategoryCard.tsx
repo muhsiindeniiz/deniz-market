@@ -1,6 +1,5 @@
-import { View, Text, TouchableOpacity } from 'react-native';
+import { TouchableOpacity, Text, Image, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { Category } from '@/lib/types';
 import { COLORS } from '@/lib/constants';
 
@@ -15,18 +14,31 @@ export default function CategoryCard({ category }: CategoryCardProps) {
         <TouchableOpacity
             onPress={() => router.push(`/category/${category.id}`)}
             className="items-center mr-4"
+            style={{ width: 80 }}
         >
             <View
-                className="w-20 h-20 rounded-2xl items-center justify-center mb-2"
+                className="w-16 h-16 rounded-2xl items-center justify-center overflow-hidden mb-2"
                 style={{ backgroundColor: category.color + '20' }}
             >
-                <Ionicons name={category.icon as any} size={32} color={category.color} />
+                {category.image_url ? (
+                    <Image
+                        source={{ uri: category.image_url }}
+                        className="w-10 h-10"
+                        resizeMode="contain"
+                    />
+                ) : (
+                    <View
+                        className="w-10 h-10 rounded-full"
+                        style={{ backgroundColor: category.color + '40' }}
+                    />
+                )}
             </View>
-            <Text className="text-sm font-medium text-center" style={{ color: COLORS.dark }}>
+            <Text
+                className="text-xs text-center font-medium"
+                style={{ color: COLORS.dark }}
+                numberOfLines={2}
+            >
                 {category.name}
-            </Text>
-            <Text className="text-xs" style={{ color: COLORS.gray }}>
-                {category.item_count} ürün
             </Text>
         </TouchableOpacity>
     );

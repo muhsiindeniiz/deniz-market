@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -7,39 +7,48 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useAuthStore } from '@/store/authStore';
 import Toast from '@/components/ui/Toast';
 import { useToast } from '@/hooks/useToast';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import '../global.css';
 
 SplashScreen.preventAutoHideAsync();
 
+SplashScreen.setOptions({
+  duration: 1000,
+  fade: true,
+});
+
 export default function RootLayout() {
-  const { checkAuth, isLoading } = useAuthStore();
+  const { checkAuth } = useAuthStore();
   const { visible, message, type, duration, hideToast } = useToast();
+  const [appIsReady, setAppIsReady] = useState(false);
 
   useEffect(() => {
     const initialize = async () => {
-      GoogleSignin.configure({
-        iosClientId: "491979314052-k2kna9glv0phkhbjf59tiaikfmugd2nu.apps.googleusercontent.com",
-        webClientId: "491979314052-0usbel7amqladm9c0nl6549b70fb48u6.apps.googleusercontent.com",
-        offlineAccess: true,
-      });
-
-      await checkAuth();
-      await SplashScreen.hideAsync();
+      try {
+        await checkAuth();
+      } catch (error) {
+        console.warn('Initialization error:', error);
+      } finally {
+        setAppIsReady(true);
+      }
     };
 
     initialize();
   }, []);
 
-  if (isLoading) {
+  const onLayoutRootView = useCallback(async () => {
+    if (appIsReady) {
+      await SplashScreen.hideAsync();
+    }
+  }, [appIsReady]);
+
+  if (!appIsReady) {
     return null;
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1}} onLayout={onLayoutRootView}>
       <SafeAreaProvider>
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="splash" />
           <Stack.Screen name="(onboarding)" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />

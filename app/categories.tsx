@@ -1,5 +1,6 @@
+// app/categories.tsx
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, FlatList, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,9 +9,13 @@ import { Category } from '@/lib/types';
 import { COLORS } from '@/lib/constants';
 import { CategoryCardSkeleton } from '@/components/ui/Loading';
 
+interface CategoryWithCount extends Category {
+    product_count: number;
+}
+
 export default function CategoriesScreen() {
     const router = useRouter();
-    const [categories, setCategories] = useState<Category[]>([]);
+    const [categories, setCategories] = useState<CategoryWithCount[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -19,12 +24,23 @@ export default function CategoriesScreen() {
 
     const loadCategories = async () => {
         try {
-            const { data } = await supabase
+            const { data, error } = await supabase
                 .from('categories')
-                .select('*')
+                .select(`
+                    *,
+                    products(count)
+                `)
                 .order('name');
 
-            if (data) setCategories(data);
+            if (error) throw error;
+
+            if (data) {
+                const categoriesWithCount = data.map((category: any) => ({
+                    ...category,
+                    product_count: category.products?.[0]?.count || 0
+                }));
+                setCategories(categoriesWithCount);
+            }
         } catch (error) {
             console.error('Error loading categories:', error);
         } finally {
@@ -32,7 +48,7 @@ export default function CategoriesScreen() {
         }
     };
 
-    const renderCategory = ({ item }: { item: Category }) => (
+    const renderCategory = ({ item }: { item: CategoryWithCount }) => (
         <TouchableOpacity
             onPress={() => router.push(`/category/${item.id}`)}
             className="bg-white rounded-3xl p-6 mb-4 mx-4"
@@ -46,10 +62,21 @@ export default function CategoriesScreen() {
         >
             <View className="flex-row items-center">
                 <View
-                    className="w-20 h-20 rounded-2xl items-center justify-center"
+                    className="w-20 h-20 rounded-2xl items-center justify-center overflow-hidden"
                     style={{ backgroundColor: item.color + '20' }}
                 >
-                    <Ionicons name={item.icon as any} size={40} color={item.color} />
+                    {item.image_url ? (
+                        <Image
+                            source={{ uri: item.image_url }}
+                            className="w-14 h-14"
+                            resizeMode="contain"
+                        />
+                    ) : (
+                        <View
+                            className="w-14 h-14 rounded-full"
+                            style={{ backgroundColor: item.color + '40' }}
+                        />
+                    )}
                 </View>
 
                 <View className="flex-1 ml-4">
@@ -57,7 +84,7 @@ export default function CategoriesScreen() {
                         {item.name}
                     </Text>
                     <Text className="text-sm" style={{ color: COLORS.gray }}>
-                        {item.item_count} ürün
+                        {item.product_count} ürün
                     </Text>
                 </View>
 
@@ -68,8 +95,15 @@ export default function CategoriesScreen() {
 
     if (loading) {
         return (
-            <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
-                <View className="bg-white px-4 py-4 border-b border-gray-200">
+            <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
+                <View className="bg-white px-4 py-4 border-b border-gray-200 flex-row items-center">
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                        style={{ backgroundColor: COLORS.background }}
+                    >
+                        <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
+                    </TouchableOpacity>
                     <Text className="text-2xl font-bold" style={{ color: COLORS.dark }}>
                         Kategoriler
                     </Text>
@@ -84,9 +118,15 @@ export default function CategoriesScreen() {
     }
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
-            {/* Header */}
-            <View className="bg-white px-4 py-4 border-b border-gray-200">
+        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
+            <View className="bg-white px-4 py-4 border-b border-gray-200 flex-row items-center">
+                <TouchableOpacity
+                    onPress={() => router.back()}
+                    className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                    style={{ backgroundColor: COLORS.background }}
+                >
+                    <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
+                </TouchableOpacity>
                 <Text className="text-2xl font-bold" style={{ color: COLORS.dark }}>
                     Kategoriler
                 </Text>

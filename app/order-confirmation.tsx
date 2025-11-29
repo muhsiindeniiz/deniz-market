@@ -9,13 +9,20 @@ import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import { Address } from '@/lib/types';
 import { COLORS, DELIVERY_FEE, FREE_DELIVERY_THRESHOLD, PAYMENT_METHODS } from '@/lib/constants';
+import { useAddressStore } from '@/store/addressStore';
 
 export default function OrderConfirmationScreen() {
     const router = useRouter();
     const { items, getTotal, clearCart } = useCartStore();
     const { user } = useAuthStore();
     const { showToast } = useToast();
-    const [addresses, setAddresses] = useState<Address[]>([]);
+    const {
+        addresses,
+        selectedAddress: storeAddress,
+        loadAddresses,
+        subscribeToAddresses,
+        unsubscribeFromAddresses
+    } = useAddressStore();
     const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash');
     const [selectedDeliveryTime, setSelectedDeliveryTime] = useState('');
@@ -26,26 +33,24 @@ export default function OrderConfirmationScreen() {
     const total = subtotal + deliveryFee;
 
     useEffect(() => {
-        loadAddresses();
-    }, []);
-
-    const loadAddresses = async () => {
-        try {
-            const { data } = await supabase
-                .from('addresses')
-                .select('*')
-                .eq('user_id', user?.id)
-                .order('is_default', { ascending: false });
-
-            if (data) {
-                setAddresses(data);
-                const defaultAddress = data.find(addr => addr.is_default);
-                setSelectedAddress(defaultAddress || data[0]);
-            }
-        } catch (error) {
-            console.error('Error loading addresses:', error);
+        if (user?.id) {
+            loadAddresses(user.id);
+            subscribeToAddresses(user.id);
         }
-    };
+
+        return () => {
+            unsubscribeFromAddresses();
+        };
+    }, [user]);
+
+    useEffect(() => {
+        if (storeAddress) {
+            setSelectedAddress(storeAddress);
+        } else if (addresses.length > 0) {
+            const defaultAddr = addresses.find(a => a.is_default) || addresses[0];
+            setSelectedAddress(defaultAddr);
+        }
+    }, [addresses, storeAddress]);
 
     const handlePlaceOrder = async () => {
         if (!selectedAddress) {
@@ -60,10 +65,8 @@ export default function OrderConfirmationScreen() {
 
         setLoading(true);
         try {
-            // Generate order number
             const orderNumber = `DM${Date.now()}`;
 
-            // Create order
             const { data: orderData, error: orderError } = await supabase
                 .from('orders')
                 .insert([
@@ -84,7 +87,6 @@ export default function OrderConfirmationScreen() {
 
             if (orderError) throw orderError;
 
-            // Create order items
             const orderItems = items.map(item => ({
                 order_id: orderData.id,
                 product_id: item.product.id,
@@ -99,10 +101,7 @@ export default function OrderConfirmationScreen() {
 
             if (itemsError) throw itemsError;
 
-            // Clear cart
             clearCart();
-
-            // Show success and navigate
             showToast('Siparişiniz başarıyla oluşturuldu!', 'success');
             router.replace(`/order-tracking/${orderData.id}`);
         } catch (error: any) {
@@ -114,7 +113,7 @@ export default function OrderConfirmationScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 flex-row items-center border-b border-gray-200">
                 <TouchableOpacity onPress={() => router.back()} className="mr-3">

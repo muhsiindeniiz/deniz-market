@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -8,50 +8,64 @@ import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import { Address } from '@/lib/types';
 import { COLORS } from '@/lib/constants';
+import { useAddressStore } from '@/store/addressStore';
 
 export default function AddressesScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
+    const {
+        addresses,
+        loadAddresses,
+        refreshAddresses,
+        subscribeToAddresses,
+        unsubscribeFromAddresses
+    } = useAddressStore();
     const { showToast } = useToast();
-    const [addresses, setAddresses] = useState<Address[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        loadAddresses();
-    }, []);
-
-    const loadAddresses = async () => {
-        try {
-            const { data } = await supabase
-                .from('addresses')
-                .select('*')
-                .eq('user_id', user?.id)
-                .order('is_default', { ascending: false });
-
-            if (data) setAddresses(data);
-        } catch (error) {
-            console.error('Error loading addresses:', error);
-        } finally {
-            setLoading(false);
+        loadData();
+        if (user?.id) {
+            subscribeToAddresses(user.id);
         }
+
+        return () => {
+            unsubscribeFromAddresses();
+        };
+    }, [user]);
+
+    useFocusEffect(
+        useCallback(() => {
+            if (user?.id) {
+                refreshAddresses(user.id);
+            }
+        }, [user])
+    );
+
+    const loadData = async () => {
+        if (user?.id) {
+            await loadAddresses(user.id);
+        }
+        setLoading(false);
     };
 
     const handleSetDefault = async (addressId: string) => {
         try {
-            // Remove default from all addresses
             await supabase
                 .from('addresses')
                 .update({ is_default: false })
                 .eq('user_id', user?.id);
 
-            // Set new default
             await supabase
                 .from('addresses')
                 .update({ is_default: true })
                 .eq('id', addressId);
 
+            if (user?.id) {
+                await refreshAddresses(user.id);
+            }
+
             showToast('Varsayılan adres güncellendi', 'success');
-            loadAddresses();
         } catch (error) {
             showToast('Adres güncellenemedi', 'error');
         }
@@ -69,8 +83,12 @@ export default function AddressesScreen() {
                     onPress: async () => {
                         try {
                             await supabase.from('addresses').delete().eq('id', address.id);
+
+                            if (user?.id) {
+                                await refreshAddresses(user.id);
+                            }
+
                             showToast('Adres silindi', 'success');
-                            loadAddresses();
                         } catch (error) {
                             showToast('Adres silinemedi', 'error');
                         }
@@ -81,7 +99,7 @@ export default function AddressesScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 flex-row items-center justify-between border-b border-gray-200">
                 <View className="flex-row items-center flex-1">

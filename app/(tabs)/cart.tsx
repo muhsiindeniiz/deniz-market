@@ -1,3 +1,4 @@
+// app/(tabs)/cart.tsx
 import { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Alert, TextInput, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -82,7 +83,7 @@ export default function CartScreen() {
 
     if (items.length === 0) {
         return (
-            <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+            <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
                 <View className="bg-white px-4 py-4 border-b border-gray-200">
                     <Text className="text-2xl font-bold" style={{ color: COLORS.dark }}>
                         Sepetim
@@ -110,19 +111,13 @@ export default function CartScreen() {
                     >
                         <Text className="text-white text-base font-semibold">Alışverişe Başla</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => router.push('/wishlist')} className="mt-4">
-                        <Text style={{ color: COLORS.primary }} className="font-semibold">
-                            Favorilerim
-                        </Text>
-                    </TouchableOpacity>
                 </View>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 border-b border-gray-200">
                 <View className="flex-row items-center justify-between">
@@ -162,6 +157,8 @@ export default function CartScreen() {
                     {items.map((item) => {
                         const price = item.product.discount_price || item.product.price;
                         const itemTotal = price * item.quantity;
+                        const isMinQuantity = item.quantity <= 1;
+                        const isMaxQuantity = item.quantity >= item.product.stock;
 
                         return (
                             <View
@@ -216,10 +213,20 @@ export default function CartScreen() {
                                         {/* Quantity Selector */}
                                         <View className="flex-row items-center bg-gray-100 rounded-xl">
                                             <TouchableOpacity
-                                                onPress={() => updateQuantity(item.product.id, item.quantity - 1)}
+                                                onPress={() => {
+                                                    if (!isMinQuantity) {
+                                                        updateQuantity(item.product.id, item.quantity - 1);
+                                                    }
+                                                }}
+                                                disabled={isMinQuantity}
                                                 className="w-8 h-8 items-center justify-center"
+                                                activeOpacity={0.7}
                                             >
-                                                <Ionicons name="remove" size={18} color={COLORS.dark} />
+                                                <Ionicons
+                                                    name="remove"
+                                                    size={18}
+                                                    color={isMinQuantity ? COLORS.gray + '80' : COLORS.dark}
+                                                />
                                             </TouchableOpacity>
 
                                             <Text className="text-base font-semibold px-3" style={{ color: COLORS.dark }}>
@@ -228,22 +235,20 @@ export default function CartScreen() {
 
                                             <TouchableOpacity
                                                 onPress={() => {
-                                                    if (item.quantity < item.product.stock) {
+                                                    if (!isMaxQuantity) {
                                                         updateQuantity(item.product.id, item.quantity + 1);
                                                     } else {
                                                         showToast('Maksimum stok miktarına ulaşıldı', 'warning');
                                                     }
                                                 }}
-                                                disabled={item.quantity >= item.product.stock}
+                                                disabled={isMaxQuantity}
                                                 className="w-8 h-8 items-center justify-center"
-                                                style={{
-                                                    opacity: item.quantity >= item.product.stock ? 0.5 : 1
-                                                }}
+                                                activeOpacity={0.7}
                                             >
                                                 <Ionicons
                                                     name="add"
                                                     size={18}
-                                                    color={item.quantity >= item.product.stock ? COLORS.gray : COLORS.dark}
+                                                    color={isMaxQuantity ? COLORS.gray + '80' : COLORS.dark}
                                                 />
                                             </TouchableOpacity>
                                         </View>

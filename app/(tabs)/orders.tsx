@@ -91,7 +91,7 @@ export default function OrdersScreen() {
 
     if (!isAuthenticated) {
         return (
-            <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+            <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
                 <View className="bg-white px-4 py-4 border-b border-gray-200">
                     <Text className="text-2xl font-bold" style={{ color: COLORS.dark }}>
                         Siparişlerim
@@ -208,7 +208,7 @@ export default function OrdersScreen() {
     );
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 border-b border-gray-200">
                 <Text className="text-2xl font-bold" style={{ color: COLORS.dark }}>

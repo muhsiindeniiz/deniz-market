@@ -1,222 +1,201 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
+import { useAddressStore } from '@/store/addressStore';
 import { useToast } from '@/hooks/useToast';
+import { Address } from '@/lib/types';
 import { COLORS } from '@/lib/constants';
 
-export default function EditAddressScreen() {
+export default function AddressesScreen() {
     const router = useRouter();
-    const { id } = useLocalSearchParams();
     const { user } = useAuthStore();
+    const { addresses, loadAddresses, refreshAddresses } = useAddressStore();
     const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [formData, setFormData] = useState({
-        title: '',
-        full_address: '',
-        city: '',
-        district: '',
-        postal_code: '',
-        is_default: false,
-    });
 
     useEffect(() => {
-        loadAddress();
-    }, [id]);
+        loadData();
+    }, []);
 
-    const loadAddress = async () => {
+    const loadData = async () => {
+        if (user?.id) {
+            await loadAddresses(user.id);
+        }
+        setLoading(false);
+    };
+
+    const handleSetDefault = async (addressId: string) => {
         try {
-            const { data } = await supabase
+            await supabase
                 .from('addresses')
-                .select('*')
-                .eq('id', id)
-                .single();
+                .update({ is_default: false })
+                .eq('user_id', user?.id);
 
-            if (data) {
-                setFormData({
-                    title: data.title,
-                    full_address: data.full_address,
-                    city: data.city,
-                    district: data.district,
-                    postal_code: data.postal_code || '',
-                    is_default: data.is_default,
-                });
+            await supabase
+                .from('addresses')
+                .update({ is_default: true })
+                .eq('id', addressId);
+
+            if (user?.id) {
+                await refreshAddresses(user.id);
             }
+
+            showToast('Varsayılan adres güncellendi', 'success');
         } catch (error) {
-            console.error('Error loading address:', error);
-        } finally {
-            setLoading(false);
+            showToast('Adres güncellenemedi', 'error');
         }
     };
 
-    const handleSave = async () => {
-        if (!formData.title || !formData.full_address || !formData.city || !formData.district) {
-            showToast('Lütfen tüm zorunlu alanları doldurun', 'warning');
-            return;
-        }
+    const handleDeleteAddress = (address: Address) => {
+        Alert.alert(
+            'Adresi Sil',
+            `${address.title} adresini silmek istediğinize emin misiniz?`,
+            [
+                { text: 'İptal', style: 'cancel' },
+                {
+                    text: 'Sil',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await supabase.from('addresses').delete().eq('id', address.id);
 
-        setSaving(true);
-        try {
-            if (formData.is_default) {
-                await supabase
-                    .from('addresses')
-                    .update({ is_default: false })
-                    .eq('user_id', user?.id)
-                    .neq('id', id);
-            }
+                            if (user?.id) {
+                                await refreshAddresses(user.id);
+                            }
 
-            const { error } = await supabase
-                .from('addresses')
-                .update(formData)
-                .eq('id', id);
-
-            if (error) throw error;
-
-            showToast('Adres başarıyla güncellendi', 'success');
-            router.back();
-        } catch (error: any) {
-            showToast(error.message || 'Adres güncellenemedi', 'error');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    if (loading) {
-        return (
-            <View className="flex-1 items-center justify-center" style={{ backgroundColor: COLORS.background }}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-            </View>
+                            showToast('Adres silindi', 'success');
+                        } catch (error) {
+                            showToast('Adres silinemedi', 'error');
+                        }
+                    },
+                },
+            ]
         );
-    }
+    };
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
-            {/* Header */}
-            <View className="bg-white px-4 py-4 flex-row items-center border-b border-gray-200">
-                <TouchableOpacity onPress={() => router.back()} className="mr-3">
-                    <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
+        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
+            {/* Header ve geri kalan kod aynı kalacak - sadece addresses state yerine store'dan gelecek */}
+            <View className="bg-white px-4 py-4 flex-row items-center justify-between border-b border-gray-200">
+                <View className="flex-row items-center flex-1">
+                    <TouchableOpacity onPress={() => router.back()} className="mr-3">
+                        <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
+                    </TouchableOpacity>
+                    <Text className="text-xl font-bold" style={{ color: COLORS.dark }}>
+                        Adreslerim
+                    </Text>
+                </View>
+
+                <TouchableOpacity onPress={() => router.push('/add-address')}>
+                    <Ionicons name="add-circle" size={28} color={COLORS.primary} />
                 </TouchableOpacity>
-                <Text className="text-xl font-bold flex-1" style={{ color: COLORS.dark }}>
-                    Adresi Düzenle
-                </Text>
             </View>
 
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                className="flex-1"
-            >
-                <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-                    <View className="p-4">
-                        {/* Same form fields as add-address */}
-                        <View className="mb-4">
-                            <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
-                                Adres Başlığı *
-                            </Text>
-                            <TextInput
-                                placeholder="Ev, İş, vb."
-                                value={formData.title}
-                                onChangeText={(text) => setFormData({ ...formData, title: text })}
-                                className="bg-white rounded-xl px-4 py-3 text-base border border-gray-200"
-                                placeholderTextColor={COLORS.gray}
-                            />
+            <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+                {addresses.length === 0 ? (
+                    <View className="flex-1 items-center justify-center px-8 py-20">
+                        <View
+                            className="w-32 h-32 rounded-full items-center justify-center mb-6"
+                            style={{ backgroundColor: COLORS.primary + '20' }}
+                        >
+                            <Ionicons name="location-outline" size={64} color={COLORS.primary} />
                         </View>
-
-                        <View className="mb-4">
-                            <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
-                                Tam Adres *
-                            </Text>
-                            <TextInput
-                                placeholder="Sokak, Mahalle, Bina No, Daire No"
-                                value={formData.full_address}
-                                onChangeText={(text) => setFormData({ ...formData, full_address: text })}
-                                className="bg-white rounded-xl px-4 py-3 text-base border border-gray-200"
-                                placeholderTextColor={COLORS.gray}
-                                multiline
-                                numberOfLines={3}
-                                textAlignVertical="top"
-                            />
-                        </View>
-
-                        <View className="mb-4">
-                            <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
-                                Şehir *
-                            </Text>
-                            <TextInput
-                                placeholder="İstanbul"
-                                value={formData.city}
-                                onChangeText={(text) => setFormData({ ...formData, city: text })}
-                                className="bg-white rounded-xl px-4 py-3 text-base border border-gray-200"
-                                placeholderTextColor={COLORS.gray}
-                            />
-                        </View>
-
-                        <View className="mb-4">
-                            <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
-                                İlçe *
-                            </Text>
-                            <TextInput
-                                placeholder="Kadıköy"
-                                value={formData.district}
-                                onChangeText={(text) => setFormData({ ...formData, district: text })}
-                                className="bg-white rounded-xl px-4 py-3 text-base border border-gray-200"
-                                placeholderTextColor={COLORS.gray}
-                            />
-                        </View>
-
-                        <View className="mb-4">
-                            <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
-                                Posta Kodu
-                            </Text>
-                            <TextInput
-                                placeholder="34000"
-                                value={formData.postal_code}
-                                onChangeText={(text) => setFormData({ ...formData, postal_code: text })}
-                                keyboardType="number-pad"
-                                className="bg-white rounded-xl px-4 py-3 text-base border border-gray-200"
-                                placeholderTextColor={COLORS.gray}
-                            />
-                        </View>
+                        <Text className="text-2xl font-bold mb-2 text-center" style={{ color: COLORS.dark }}>
+                            Henüz Adres Yok
+                        </Text>
+                        <Text className="text-base text-center mb-6" style={{ color: COLORS.gray }}>
+                            Sipariş verebilmek için bir teslimat adresi eklemelisiniz.
+                        </Text>
 
                         <TouchableOpacity
-                            onPress={() => setFormData({ ...formData, is_default: !formData.is_default })}
-                            className="bg-white rounded-xl p-4 flex-row items-center justify-between mb-6"
+                            onPress={() => router.push('/add-address')}
+                            className="rounded-xl px-8 py-4"
+                            style={{ backgroundColor: COLORS.primary }}
                         >
-                            <Text className="text-base font-semibold" style={{ color: COLORS.dark }}>
-                                Varsayılan adres olarak ayarla
-                            </Text>
-                            <View
-                                className="w-12 h-6 rounded-full justify-center"
-                                style={{ backgroundColor: formData.is_default ? COLORS.primary : COLORS.gray + '40' }}
-                            >
-                                <View
-                                    className="w-5 h-5 rounded-full bg-white"
-                                    style={{
-                                        marginLeft: formData.is_default ? 26 : 2,
-                                    }}
-                                />
-                            </View>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={handleSave}
-                            disabled={saving}
-                            className="rounded-xl py-4 mb-6"
-                            style={{
-                                backgroundColor: COLORS.primary,
-                                opacity: saving ? 0.7 : 1,
-                            }}
-                        >
-                            <Text className="text-white text-center text-lg font-semibold">
-                                {saving ? 'Güncelleniyor...' : 'Değişiklikleri Kaydet'}
-                            </Text>
+                            <Text className="text-white text-base font-semibold">Adres Ekle</Text>
                         </TouchableOpacity>
                     </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
+                ) : (
+                    <View className="px-4 py-4">
+                        {addresses.map((address) => (
+                            <View
+                                key={address.id}
+                                className="bg-white rounded-3xl p-5 mb-4"
+                                style={{
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.1,
+                                    shadowRadius: 8,
+                                    elevation: 3,
+                                }}
+                            >
+                                <View className="flex-row items-start mb-3">
+                                    <View
+                                        className="w-12 h-12 rounded-xl items-center justify-center mr-3"
+                                        style={{ backgroundColor: COLORS.primary + '20' }}
+                                    >
+                                        <Ionicons name="location" size={24} color={COLORS.primary} />
+                                    </View>
+
+                                    <View className="flex-1">
+                                        <View className="flex-row items-center mb-2">
+                                            <Text className="text-lg font-bold mr-2" style={{ color: COLORS.dark }}>
+                                                {address.title}
+                                            </Text>
+                                            {address.is_default && (
+                                                <View className="px-2 py-1 rounded" style={{ backgroundColor: COLORS.primary }}>
+                                                    <Text className="text-white text-xs font-semibold">Varsayılan</Text>
+                                                </View>
+                                            )}
+                                        </View>
+
+                                        <Text className="text-sm mb-1" style={{ color: COLORS.gray }}>
+                                            {address.full_address}
+                                        </Text>
+                                        <Text className="text-sm" style={{ color: COLORS.gray }}>
+                                            {address.district}, {address.city}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <View className="flex-row">
+                                    {!address.is_default && (
+                                        <TouchableOpacity
+                                            onPress={() => handleSetDefault(address.id)}
+                                            className="flex-1 rounded-xl py-3 mr-2 border-2"
+                                            style={{ borderColor: COLORS.primary }}
+                                        >
+                                            <Text className="text-center font-semibold" style={{ color: COLORS.primary }}>
+                                                Varsayılan Yap
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+
+                                    <TouchableOpacity
+                                        onPress={() => router.push(`/edit-address/${address.id}`)}
+                                        className="flex-1 rounded-xl py-3 mx-1"
+                                        style={{ backgroundColor: COLORS.primary }}
+                                    >
+                                        <Text className="text-white text-center font-semibold">Düzenle</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => handleDeleteAddress(address)}
+                                        className="w-12 rounded-xl items-center justify-center ml-2"
+                                        style={{ backgroundColor: COLORS.danger }}
+                                    >
+                                        <Ionicons name="trash-outline" size={20} color={COLORS.white} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                )}
+            </ScrollView>
         </SafeAreaView>
     );
 }

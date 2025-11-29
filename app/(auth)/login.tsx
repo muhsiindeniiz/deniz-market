@@ -1,4 +1,3 @@
-// app/(auth)/login.tsx
 import { useState, useEffect } from "react";
 import {
     View,
@@ -22,6 +21,7 @@ import {
     GoogleSignin,
     statusCodes,
 } from "@react-native-google-signin/google-signin";
+import * as Crypto from 'expo-crypto';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -36,6 +36,7 @@ export default function LoginScreen() {
     const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
+        // Web client ID'yi kullanın - bu Supabase dashboard'da da yapılandırılmalı
         GoogleSignin.configure({
             webClientId: "491979314052-0usbel7amqladm9c0nl6549b70fb48u6.apps.googleusercontent.com",
             iosClientId: "491979314052-k2kna9glv0phkhbjf59tiaikfmugd2nu.apps.googleusercontent.com",
@@ -43,6 +44,35 @@ export default function LoginScreen() {
             scopes: ['profile', 'email'],
         });
     }, []);
+
+    // SHA256 hash fonksiyonu
+    const sha256 = async (input: string): Promise<string> => {
+        const digest = await Crypto.digestStringAsync(
+            Crypto.CryptoDigestAlgorithm.SHA256,
+            input
+        );
+        return digest;
+    };
+
+    // Rastgele nonce üretici
+    const generateNonce = (): string => {
+        const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+        let nonce = '';
+        const randomValues = new Uint8Array(32);
+
+        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+            crypto.getRandomValues(randomValues);
+        } else {
+            for (let i = 0; i < randomValues.length; i++) {
+                randomValues[i] = Math.floor(Math.random() * 256);
+            }
+        }
+
+        for (let i = 0; i < 32; i++) {
+            nonce += charset[randomValues[i] % charset.length];
+        }
+        return nonce;
+    };
 
     const checkUserAndNavigate = async (
         userId: string,
@@ -188,7 +218,14 @@ export default function LoginScreen() {
             // Play Services kontrolü
             await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
-            // Google Sign-In
+            // Raw nonce oluştur ve hash'le
+            const rawNonce = generateNonce();
+            const hashedNonce = await sha256(rawNonce);
+
+            console.log("Raw nonce generated");
+            console.log("Hashed nonce generated");
+
+            // Google Sign-In'i başlat (nonce parametre olarak desteklenmiyor)
             console.log("Calling GoogleSignin.signIn()...");
             const response = await GoogleSignin.signIn();
 
@@ -208,6 +245,7 @@ export default function LoginScreen() {
                 googleUser = response.data.user;
                 idToken = response.data.idToken;
             } else if ((response as any).user) {
+                // Eski API desteği
                 googleUser = (response as any).user;
                 idToken = (response as any).idToken;
             }
@@ -223,8 +261,7 @@ export default function LoginScreen() {
                 throw new Error("Google kimlik doğrulama başarısız - ID token alınamadı");
             }
 
-            // Supabase ile kimlik doğrula - nonce OLMADAN
-            // Google Sign-In paketi nonce desteklemediği için nonce göndermiyoruz
+            // Supabase ile kimlik doğrula (nonce olmadan)
             console.log("Authenticating with Supabase...");
 
             const { data: authData, error: authError } = await supabase.auth.signInWithIdToken({
@@ -235,12 +272,32 @@ export default function LoginScreen() {
             if (authError) {
                 console.error("Supabase auth error:", authError.message);
 
-                // Kullanıcı zaten varsa veya başka bir hata varsa
-                if (authError.message.includes("already registered") ||
-                    authError.message.includes("already exists")) {
-                    // E-posta ile kullanıcıyı bul ve yönlendir
-                    await handleExistingGoogleUser(googleUser);
-                    return;
+                // Nonce hatası varsa, alternatif yöntemi dene
+                if (authError.message.toLowerCase().includes("nonce")) {
+                    console.log("Nonce error, trying without nonce...");
+
+                    // Nonce olmadan dene (bazı yapılandırmalarda çalışabilir)
+                    const { data: retryData, error: retryError } = await supabase.auth.signInWithIdToken({
+                        provider: "google",
+                        token: idToken,
+                    });
+
+                    if (retryError) {
+                        console.error("Retry without nonce failed:", retryError.message);
+                        // E-posta ile kullanıcı kontrolü yap
+                        await handleGoogleUserFallback(googleUser);
+                        return;
+                    }
+
+                    if (retryData?.user) {
+                        console.log("Supabase auth successful without nonce");
+                        await checkUserAndNavigate(
+                            retryData.user.id,
+                            googleUser.email,
+                            googleUser.name
+                        );
+                        return;
+                    }
                 }
 
                 throw authError;
@@ -248,7 +305,6 @@ export default function LoginScreen() {
 
             if (authData?.user) {
                 console.log("Supabase authentication successful");
-                console.log("Supabase user ID:", authData.user.id);
                 await checkUserAndNavigate(
                     authData.user.id,
                     googleUser.email,
@@ -268,11 +324,7 @@ export default function LoginScreen() {
             } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
                 showToast("Google Play Hizmetleri kullanılamıyor", "error");
             } else if (error.message?.includes("DEVELOPER_ERROR")) {
-                showToast("Google yapılandırma hatası. Lütfen SHA-1 sertifikasını kontrol edin.", "error");
-            } else if (error.message?.includes("nonce") || error.message?.includes("Nonce")) {
-                // Nonce hatası - Supabase ayarlarını kontrol etmek gerekiyor
-                console.log("Nonce error - check Supabase Google provider settings");
-                showToast("Kimlik doğrulama hatası. Lütfen tekrar deneyin.", "error");
+                showToast("Google yapılandırma hatası. Lütfen daha sonra tekrar deneyin.", "error");
             } else {
                 showToast(error.message || "Google girişi yapılamadı", "error");
             }
@@ -282,26 +334,12 @@ export default function LoginScreen() {
         }
     };
 
-    // Mevcut Google kullanıcısını kontrol et
-    const handleExistingGoogleUser = async (googleUser: any) => {
+    // Google kullanıcısı için fallback - e-posta kontrolü
+    const handleGoogleUserFallback = async (googleUser: any) => {
         try {
-            console.log("Checking existing user for email:", googleUser.email);
+            console.log("Trying fallback for email:", googleUser.email);
 
-            // Supabase Auth'da bu e-posta ile kullanıcı var mı?
-            // getUser ile mevcut session'ı kontrol et
-            const { data: sessionData } = await supabase.auth.getSession();
-
-            if (sessionData?.session?.user) {
-                // Session varsa kullanıcıyı yönlendir
-                await checkUserAndNavigate(
-                    sessionData.session.user.id,
-                    googleUser.email,
-                    googleUser.name
-                );
-                return;
-            }
-
-            // Users tablosunda bu e-posta var mı?
+            // Users tablosunda bu e-posta var mı kontrol et
             const { data: existingUser, error: checkError } = await supabase
                 .from("users")
                 .select("*")
@@ -313,8 +351,10 @@ export default function LoginScreen() {
             }
 
             if (existingUser) {
+                // Kullanıcı mevcut - e-posta/şifre ile giriş yapması gerekiyor
+                console.log("User exists with this email, prompt for email login");
                 showToast(
-                    "Bu e-posta zaten kayıtlı. Lütfen e-posta ve şifrenizle giriş yapın.",
+                    "Bu e-posta adresi zaten kayıtlı. Lütfen e-posta ve şifrenizle giriş yapın.",
                     "warning"
                 );
                 setShowEmailForm(true);
@@ -322,12 +362,12 @@ export default function LoginScreen() {
                 return;
             }
 
-            // Hiçbir kullanıcı bulunamadı
+            // Kullanıcı yok - kayıt sayfasına yönlendir
             showToast("Hesabınız bulunamadı. Lütfen kayıt olun.", "info");
             router.push("/(auth)/register");
 
         } catch (error: any) {
-            console.error("handleExistingGoogleUser error:", error);
+            console.error("handleGoogleUserFallback error:", error);
             showToast("Bir hata oluştu. Lütfen e-posta ile giriş yapın.", "error");
             setShowEmailForm(true);
         }
@@ -348,7 +388,7 @@ export default function LoginScreen() {
             end={{ x: 0, y: 1 }}
             style={{ flex: 1 }}
         >
-            <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
+            <SafeAreaView className="flex-1"style={{ flex: 1 }} edges={["top", "left", "right"]}>
                 <KeyboardAvoidingView
                     behavior={Platform.OS === "ios" ? "padding" : "height"}
                     style={{ flex: 1 }}

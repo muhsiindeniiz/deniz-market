@@ -175,6 +175,7 @@ export const HomeScreenSkeleton: React.FC = () => {
 const styles = StyleSheet.create({
     productCard: {
         width: 160,
+        height: 260,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
