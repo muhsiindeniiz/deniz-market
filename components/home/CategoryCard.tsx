@@ -23,7 +23,7 @@ export default function CategoryCard({ category }: CategoryCardProps) {
                 {category.image_url ? (
                     <Image
                         source={{ uri: category.image_url }}
-                        className="w-10 h-10"
+                        className="w-14 h-14"
                         resizeMode="contain"
                     />
                 ) : (

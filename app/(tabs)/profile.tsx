@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -50,11 +50,15 @@ export default function ProfileScreen() {
                         onPress={() => router.push('/(auth)/login')}
                         className="rounded-xl px-8 py-4 mb-3"
                         style={{ backgroundColor: COLORS.primary }}
+                        activeOpacity={0.8}
                     >
                         <Text className="text-white text-base font-semibold">Giriş Yap</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+                    <TouchableOpacity
+                        onPress={() => router.push('/(auth)/register')}
+                        activeOpacity={0.8}
+                    >
                         <Text style={{ color: COLORS.primary }} className="font-semibold">
                             Hesap Oluştur
                         </Text>
@@ -65,6 +69,12 @@ export default function ProfileScreen() {
     }
 
     const menuItems = [
+        {
+            section: 'Siparişler',
+            items: [
+                { icon: 'receipt-outline', label: 'Siparişlerim', route: '/orders' },
+            ],
+        },
         {
             section: 'Hesap',
             items: [
@@ -96,7 +106,7 @@ export default function ProfileScreen() {
     ];
 
     return (
-        <SafeAreaView style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 border-b border-gray-200">
                 <Text className="text-2xl font-bold" style={{ color: COLORS.dark }}>
@@ -148,6 +158,7 @@ export default function ProfileScreen() {
                                         borderBottomWidth: itemIndex < section.items.length - 1 ? 1 : 0,
                                         borderBottomColor: '#F0F0F0',
                                     }}
+                                    activeOpacity={0.7}
                                 >
                                     <View className="flex-row items-center flex-1">
                                         <Ionicons name={item.icon as any} size={24} color={COLORS.dark} />
@@ -167,6 +178,7 @@ export default function ProfileScreen() {
                     <TouchableOpacity
                         onPress={handleSignOut}
                         className="bg-white rounded-3xl py-4 flex-row items-center justify-center"
+                        activeOpacity={0.7}
                     >
                         <Ionicons name="log-out-outline" size={24} color={COLORS.danger} />
                         <Text className="ml-3 text-base font-semibold" style={{ color: COLORS.danger }}>

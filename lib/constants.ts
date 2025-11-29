@@ -10,6 +10,8 @@ export const COLORS = {
     gray: '#637381',
     white: '#FFFFFF',
     background: '#F5F5F5',
+    light: '#ECF0F1',
+    success: '#27AE60',
 };
 
 export const FONTS = {
@@ -37,8 +39,8 @@ export const SPACING = {
     xxl: 48,
 };
 
-export const FREE_DELIVERY_THRESHOLD = 500;
-export const DELIVERY_FEE = 40;
+export const FREE_DELIVERY_THRESHOLD = 150;
+export const DELIVERY_FEE = 15;
 
 export const ORDER_STATUS_LABELS = {
     pending: 'Sipariş Alındı',
@@ -53,3 +55,4 @@ export const PAYMENT_METHODS = [
     { id: 'cash', label: 'Kapıda Nakit Ödeme', icon: 'cash-outline' },
     { id: 'card', label: 'Kapıda Kredi Kartı', icon: 'card-outline' },
 ];
+

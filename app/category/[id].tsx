@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, FlatList } from 'react-native';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, FlatList, Modal, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,7 +7,6 @@ import { supabase } from '@/lib/supabase';
 import { Product, Category } from '@/lib/types';
 import { COLORS } from '@/lib/constants';
 import ProductCard from '@/components/home/ProductCard';
-import BottomSheet from '@gorhom/bottom-sheet';
 import { ProductCardSkeleton } from '@/components/ui/Loading';
 
 export default function CategoryDetailScreen() {
@@ -18,7 +17,7 @@ export default function CategoryDetailScreen() {
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [sortBy, setSortBy] = useState<'name' | 'price_asc' | 'price_desc' | 'rating'>('name');
-    const bottomSheetRef = useRef<BottomSheet>(null);
+    const [showSortModal, setShowSortModal] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -26,7 +25,6 @@ export default function CategoryDetailScreen() {
 
     const loadData = async () => {
         try {
-            // Load category
             const { data: categoryData } = await supabase
                 .from('categories')
                 .select('*')
@@ -35,13 +33,11 @@ export default function CategoryDetailScreen() {
 
             if (categoryData) setCategory(categoryData);
 
-            // Load products
             let query = supabase
                 .from('products')
                 .select('*, category:categories(*)')
                 .eq('category_id', id);
 
-            // Apply sorting
             switch (sortBy) {
                 case 'price_asc':
                     query = query.order('price', { ascending: true });
@@ -66,11 +62,19 @@ export default function CategoryDetailScreen() {
         }
     };
 
-    const openSortSheet = () => {
-        bottomSheetRef.current?.expand();
+    const sortOptions = [
+        { value: 'name' as const, label: 'İsme göre (A-Z)' },
+        { value: 'price_asc' as const, label: 'Fiyat (Düşükten Yükseğe)' },
+        { value: 'price_desc' as const, label: 'Fiyat (Yüksekten Düşüğe)' },
+        { value: 'rating' as const, label: 'En Yüksek Puanlı' },
+    ];
+
+    const handleSortSelect = (value: 'name' | 'price_asc' | 'price_desc' | 'rating') => {
+        setSortBy(value);
+        setShowSortModal(false);
     };
 
-    const renderProduct = ({ item }: { item: Product }) => {
+    const renderProduct = ({ item, index }: { item: Product; index: number }) => {
         if (viewMode === 'list') {
             return (
                 <TouchableOpacity
@@ -103,7 +107,7 @@ export default function CategoryDetailScreen() {
         }
 
         return (
-            <View className="w-1/2 px-2 mb-4">
+            <View style={{ width: '50%', paddingLeft: index % 2 === 0 ? 16 : 8, paddingRight: index % 2 === 0 ? 8 : 16, marginBottom: 16 }}>
                 <ProductCard product={item} />
             </View>
         );
@@ -111,7 +115,7 @@ export default function CategoryDetailScreen() {
 
     if (loading) {
         return (
-            <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
+            <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
                 <View className="bg-white px-4 py-4 flex-row items-center justify-between border-b border-gray-200">
                     <View className="flex-row items-center flex-1">
                         <TouchableOpacity onPress={() => router.back()} className="mr-3">
@@ -129,7 +133,7 @@ export default function CategoryDetailScreen() {
                 <View className="bg-white px-4 py-3 border-b border-gray-200">
                     <View className="flex-row items-center">
                         <View className="flex-1 h-12 bg-gray-100 rounded-xl mr-3" />
-                        <View className="w-12 h-12 rounded-xl bg-gray-100 mr-2" />
+                        <View className="w-24 h-12 rounded-xl bg-gray-100 mr-2" />
                         <View className="w-12 h-12 rounded-xl bg-gray-100" />
                     </View>
                 </View>
@@ -144,7 +148,7 @@ export default function CategoryDetailScreen() {
     }
 
     return (
-        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 flex-row items-center justify-between border-b border-gray-200">
                 <View className="flex-row items-center flex-1">
@@ -174,20 +178,50 @@ export default function CategoryDetailScreen() {
                         </Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                        className="w-12 h-12 rounded-xl items-center justify-center mr-2"
-                        style={{ backgroundColor: COLORS.background }}
-                    >
-                        <Ionicons name={viewMode === 'grid' ? 'list' : 'grid'} size={24} color={COLORS.dark} />
-                    </TouchableOpacity>
+                    {/* Grid/List Toggle Buttons */}
+                    <View className="flex-row rounded-xl overflow-hidden mr-2" style={{ backgroundColor: '#E5E7EB' }}>
+                        <TouchableOpacity
+                            onPress={() => setViewMode('grid')}
+                            className="w-11 h-11 items-center justify-center"
+                            style={{
+                                backgroundColor: viewMode === 'grid' ? COLORS.primary : 'transparent',
+                            }}
+                        >
+                            <Ionicons
+                                name="grid"
+                                size={20}
+                                color={viewMode === 'grid' ? '#FFFFFF' : COLORS.gray}
+                            />
+                        </TouchableOpacity>
 
+                        <TouchableOpacity
+                            onPress={() => setViewMode('list')}
+                            className="w-11 h-11 items-center justify-center"
+                            style={{
+                                backgroundColor: viewMode === 'list' ? COLORS.primary : 'transparent',
+                            }}
+                        >
+                            <Ionicons
+                                name="list"
+                                size={20}
+                                color={viewMode === 'list' ? '#FFFFFF' : COLORS.gray}
+                            />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Filter Button */}
                     <TouchableOpacity
-                        onPress={openSortSheet}
-                        className="w-12 h-12 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: COLORS.background }}
+                        onPress={() => setShowSortModal(true)}
+                        className="w-11 h-11 rounded-xl items-center justify-center"
+                        style={{
+                            backgroundColor: sortBy !== 'name' ? COLORS.primary : '#E5E7EB',
+                        }}
                     >
-                        <Ionicons name="filter" size={24} color={COLORS.dark} />
+                        <Ionicons
+                            name="funnel"
+                            size={20}
+                            color={sortBy !== 'name' ? '#FFFFFF' : COLORS.gray}
+                        />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -206,52 +240,81 @@ export default function CategoryDetailScreen() {
                 keyExtractor={(item) => item.id}
                 numColumns={viewMode === 'grid' ? 2 : 1}
                 key={viewMode}
-                contentContainerStyle={{ paddingHorizontal: viewMode === 'grid' ? 8 : 0 }}
                 showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 20 }}
             />
 
-            {/* Sort Bottom Sheet */}
-            <BottomSheet
-                ref={bottomSheetRef}
-                index={-1}
-                snapPoints={['50%']}
-                enablePanDownToClose
+            {/* Sort Modal */}
+            <Modal
+                visible={showSortModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowSortModal(false)}
             >
-                <View className="flex-1 px-6 py-4">
-                    <Text className="text-xl font-bold mb-4" style={{ color: COLORS.dark }}>
-                        Sıralama
-                    </Text>
-
-                    {[
-                        { value: 'name', label: 'İsme göre (A-Z)' },
-                        { value: 'price_asc', label: 'Fiyat (Düşükten Yükseğe)' },
-                        { value: 'price_desc', label: 'Fiyat (Yüksekten Düşüğe)' },
-                        { value: 'rating', label: 'En Yüksek Puanlı' },
-                    ].map((option) => (
-                        <TouchableOpacity
-                            key={option.value}
-                            onPress={() => {
-                                setSortBy(option.value as any);
-                                bottomSheetRef.current?.close();
-                            }}
-                            className="flex-row items-center justify-between py-4 border-b border-gray-200"
-                        >
-                            <Text
-                                className="text-base"
+                <Pressable
+                    className="flex-1 justify-end"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+                    onPress={() => setShowSortModal(false)}
+                >
+                    <Pressable
+                        className="bg-white rounded-t-3xl"
+                        onPress={(e) => e.stopPropagation()}
+                    >
+                        {/* Handle Bar */}
+                        <View className="items-center pt-3 pb-2">
+                            <View
                                 style={{
-                                    color: sortBy === option.value ? COLORS.primary : COLORS.dark,
-                                    fontWeight: sortBy === option.value ? '600' : '400',
+                                    width: 40,
+                                    height: 4,
+                                    backgroundColor: COLORS.gray,
+                                    borderRadius: 2,
+                                    opacity: 0.3,
                                 }}
-                            >
-                                {option.label}
+                            />
+                        </View>
+
+                        <View className="px-6 py-4">
+                            <Text className="text-xl font-bold mb-4" style={{ color: COLORS.dark }}>
+                                Sıralama
                             </Text>
-                            {sortBy === option.value && (
-                                <Ionicons name="checkmark" size={24} color={COLORS.primary} />
-                            )}
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            </BottomSheet>
+
+                            {sortOptions.map((option) => (
+                                <TouchableOpacity
+                                    key={option.value}
+                                    onPress={() => handleSortSelect(option.value)}
+                                    className="flex-row items-center justify-between py-4 border-b"
+                                    style={{ borderBottomColor: '#E5E7EB' }}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text
+                                        className="text-base"
+                                        style={{
+                                            color: sortBy === option.value ? COLORS.primary : COLORS.dark,
+                                            fontWeight: sortBy === option.value ? '600' : '400',
+                                        }}
+                                    >
+                                        {option.label}
+                                    </Text>
+                                    {sortBy === option.value && (
+                                        <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+
+                            {/* Cancel Button */}
+                            <TouchableOpacity
+                                onPress={() => setShowSortModal(false)}
+                                className="mt-4 mb-6 py-4 rounded-xl items-center"
+                                style={{ backgroundColor: COLORS.background }}
+                            >
+                                <Text className="text-base font-semibold" style={{ color: COLORS.dark }}>
+                                    İptal
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </SafeAreaView>
     );
 }
