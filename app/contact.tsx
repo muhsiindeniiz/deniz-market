@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Linking } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Linking, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,8 +24,6 @@ export default function ContactScreen() {
         setLoading(true);
         try {
             // Send contact form to backend
-            // Implement your logic here
-
             showToast('Mesajınız başarıyla gönderildi', 'success');
             router.back();
         } catch (error) {
@@ -60,7 +58,7 @@ export default function ContactScreen() {
     ];
 
     return (
-        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 flex-row items-center border-b border-gray-200">
                 <TouchableOpacity onPress={() => router.back()} className="mr-3">
@@ -128,7 +126,7 @@ export default function ContactScreen() {
                                 <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                     Ad Soyad
                                 </Text>
-                                <View className="bg-gray-100 rounded-xl px-4 py-3">
+                                <View className="bg-gray-100 rounded-xl px-4 justify-center" style={styles.readOnlyContainer}>
                                     <Text className="text-base" style={{ color: COLORS.gray }}>
                                         {user?.full_name || 'Misafir'}
                                     </Text>
@@ -140,7 +138,7 @@ export default function ContactScreen() {
                                 <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                     E-posta
                                 </Text>
-                                <View className="bg-gray-100 rounded-xl px-4 py-3">
+                                <View className="bg-gray-100 rounded-xl px-4 justify-center" style={styles.readOnlyContainer}>
                                     <Text className="text-base" style={{ color: COLORS.gray }}>
                                         {user?.email || '-'}
                                     </Text>
@@ -156,7 +154,8 @@ export default function ContactScreen() {
                                     placeholder="Mesaj konusu"
                                     value={subject}
                                     onChangeText={setSubject}
-                                    className="bg-gray-100 rounded-xl px-4 py-3 text-base"
+                                    className="bg-gray-100 rounded-xl"
+                                    style={styles.input}
                                     placeholderTextColor={COLORS.gray}
                                 />
                             </View>
@@ -170,7 +169,8 @@ export default function ContactScreen() {
                                     placeholder="Mesajınızı buraya yazın..."
                                     value={message}
                                     onChangeText={setMessage}
-                                    className="bg-gray-100 rounded-xl px-4 py-3 text-base"
+                                    className="bg-gray-100 rounded-xl"
+                                    style={styles.multilineInput}
                                     placeholderTextColor={COLORS.gray}
                                     multiline
                                     numberOfLines={6}
@@ -204,7 +204,7 @@ export default function ContactScreen() {
                                     Çalışma Saatleri
                                 </Text>
                                 <Text className="text-sm" style={{ color: COLORS.gray }}>
-                                    Pazartesi - Pazar: 08:00 - 23:00
+                                    Pazartesi - Pazar: 08:00 - 21:00
                                 </Text>
                                 <Text className="text-sm" style={{ color: COLORS.gray }}>
                                     Müşteri hizmetlerimiz 7/24 hizmetinizdedir.
@@ -217,3 +217,22 @@ export default function ContactScreen() {
         </SafeAreaView>
     );
 }
+
+const styles = StyleSheet.create({
+    input: {
+        height: 50,
+        paddingHorizontal: 16,
+        fontSize: 16,
+        textAlignVertical: 'center',
+    },
+    multilineInput: {
+        minHeight: 120,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 12,
+        fontSize: 16,
+    },
+    readOnlyContainer: {
+        height: 50,
+    },
+});

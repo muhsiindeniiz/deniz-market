@@ -1,6 +1,6 @@
 // app/(tabs)/index.tsx
-import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Animated } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,17 +19,21 @@ export default function HomeScreen() {
     const { user } = useAuthStore();
     const itemCount = useCartStore((state) => state.getItemCount());
     const { selectedAddress, loadAddresses, subscribeToAddresses, unsubscribeFromAddresses } = useAddressStore();
+
     const [categories, setCategories] = useState<Category[]>([]);
     const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
     const [bestSellingProducts, setBestSellingProducts] = useState<Product[]>([]);
     const [refreshing, setRefreshing] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [showUrgencyBanner, setShowUrgencyBanner] = useState(true);
+    const [unreadNotifications, setUnreadNotifications] = useState(0);
 
     useEffect(() => {
         loadData();
         if (user?.id) {
             loadAddresses(user.id);
             subscribeToAddresses(user.id);
+            loadUnreadNotifications();
         }
 
         return () => {
@@ -41,47 +45,92 @@ export default function HomeScreen() {
         ? `${selectedAddress.district}, ${selectedAddress.city}`
         : 'Adres Seçin';
 
-    const loadData = async () => {
+    const loadUnreadNotifications = async () => {
+        if (!user?.id) return;
+
         try {
-            const { data: categoriesData } = await supabase
-                .from('categories')
-                .select('*')
-                .limit(8);
+            const { count, error } = await supabase
+                .from('notifications')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id)
+                .eq('is_read', false);
 
-            if (categoriesData) setCategories(categoriesData);
-
-            const { data: featuredData } = await supabase
-                .from('products')
-                .select('*, category:categories(*), store:stores(*)')
-                .eq('is_featured', true)
-                .limit(10);
-
-            if (featuredData) setFeaturedProducts(featuredData);
-
-            const { data: bestSellingData } = await supabase
-                .from('products')
-                .select('*, category:categories(*), store:stores(*)')
-                .order('created_at', { ascending: false })
-                .limit(10);
-
-            if (bestSellingData) setBestSellingProducts(bestSellingData);
+            if (!error && count !== null) {
+                setUnreadNotifications(count);
+            }
         } catch (error) {
-            console.error('Error loading data:', error);
+            console.error('Error loading notifications count:', error);
         }
     };
 
-    const onRefresh = async () => {
+    const loadData = useCallback(async () => {
+        try {
+            // Kategorileri yükle
+            const { data: categoriesData, error: categoriesError } = await supabase
+                .from('categories')
+                .select('*')
+                .order('item_count', { ascending: false })
+                .limit(8);
+
+            if (categoriesError) throw categoriesError;
+            if (categoriesData) setCategories(categoriesData);
+
+            // Öne çıkan ürünleri yükle
+            const { data: featuredData, error: featuredError } = await supabase
+                .from('products')
+                .select('*, category:categories(*), store:stores(*)')
+                .eq('is_featured', true)
+                .gt('stock', 0)
+                .limit(10);
+
+            if (featuredError) throw featuredError;
+            if (featuredData) setFeaturedProducts(featuredData);
+
+            // Çok satanları yükle (review_count'a göre sırala)
+            const { data: bestSellingData, error: bestSellingError } = await supabase
+                .from('products')
+                .select('*, category:categories(*), store:stores(*)')
+                .gt('stock', 0)
+                .order('review_count', { ascending: false })
+                .limit(10);
+
+            if (bestSellingError) throw bestSellingError;
+            if (bestSellingData) setBestSellingProducts(bestSellingData);
+
+        } catch (error) {
+            console.error('Error loading data:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const onRefresh = useCallback(async () => {
         setRefreshing(true);
         await loadData();
         if (user?.id) {
             await loadAddresses(user.id);
+            await loadUnreadNotifications();
         }
         setRefreshing(false);
-    };
+    }, [user, loadData, loadAddresses]);
+
+    if (loading) {
+        return (
+            <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+                <View className="flex-1 items-center justify-center">
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <Text className="mt-4" style={{ color: COLORS.gray }}>
+                        Yükleniyor...
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
-        <SafeAreaView style={{ backgroundColor: COLORS.background }}>
-            <View className="bg-white px-4 py-3 border-b border-gray-200">
+        <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+            {/* Header */}
+            <View className="bg-white px-4 py-3 border-b border-gray-100">
                 <View className="flex-row items-center justify-between">
                     <TouchableOpacity
                         onPress={() => router.push('/addresses')}
@@ -118,10 +167,16 @@ export default function HomeScreen() {
                             activeOpacity={0.7}
                         >
                             <Ionicons name="notifications-outline" size={24} color={COLORS.dark} />
-                            <View
-                                className="absolute top-1 right-1 w-2 h-2 rounded-full"
-                                style={{ backgroundColor: COLORS.danger }}
-                            />
+                            {unreadNotifications > 0 && (
+                                <View
+                                    className="absolute -top-0.5 -right-0.5 min-w-5 h-5 rounded-full items-center justify-center px-1"
+                                    style={{ backgroundColor: COLORS.danger }}
+                                >
+                                    <Text className="text-white text-xs font-bold">
+                                        {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                                    </Text>
+                                </View>
+                            )}
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -139,10 +194,15 @@ export default function HomeScreen() {
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={COLORS.primary}
+                        colors={[COLORS.primary]}
+                    />
                 }
             >
-                {/* 2. SEARCH BAR - Full Width, Prominent */}
+                {/* Search Bar */}
                 <View className="px-4 pt-4 pb-3">
                     <TouchableOpacity
                         onPress={() => router.push('/search')}
@@ -163,7 +223,7 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* 3. URGENCY BANNER - Son 1 Saat */}
+                {/* Urgency Banner */}
                 {showUrgencyBanner && (
                     <View className="mx-4 mb-3">
                         <View
@@ -187,7 +247,8 @@ export default function HomeScreen() {
                             </View>
                             <TouchableOpacity
                                 onPress={() => setShowUrgencyBanner(false)}
-                                className="ml-2"
+                                className="ml-2 p-1"
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                             >
                                 <Ionicons name="close-circle" size={24} color="#F57C00" />
                             </TouchableOpacity>
@@ -195,11 +256,11 @@ export default function HomeScreen() {
                     </View>
                 )}
 
-                {/* 4. HERO CAROUSEL - Max 2-3 Slides */}
+                {/* Promo Carousel - Data from Supabase */}
                 <PromoCarousel />
 
-                {/* 5. KATEGORİLER - Üstte, 4'lü Grid */}
-                <View className="px-4 mt-4">
+                {/* Categories */}
+                <View className="px-4 mt-6">
                     <View className="flex-row items-center justify-between mb-4">
                         <Text className="text-xl font-bold" style={{ color: COLORS.dark }}>
                             Kategoriler
@@ -207,58 +268,68 @@ export default function HomeScreen() {
                         <TouchableOpacity
                             onPress={() => router.push('/categories')}
                             activeOpacity={0.7}
+                            className="flex-row items-center"
                         >
-                            <View className="flex-row items-center">
-                                <Text style={{ color: COLORS.primary }} className="font-semibold text-sm mr-1">
-                                    Hepsini Gör
-                                </Text>
-                                <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
-                            </View>
+                            <Text style={{ color: COLORS.primary }} className="font-semibold text-sm mr-1">
+                                Hepsini Gör
+                            </Text>
+                            <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
                         </TouchableOpacity>
                     </View>
 
-                    <View className="flex-row flex-wrap -mx-2">
-                        {categories.slice(0, 8).map((category) => (
-                            <View key={category.id} className="w-1/4 px-2 mb-3">
-                                <CategoryCard category={category} />
-                            </View>
-                        ))}
-                    </View>
-                </View>
-
-                {/* 6. ÇOK SATANLAR - Sosyal Kanıt */}
-                <View className="mt-6">
-                    <View className="px-4 flex-row items-center justify-between mb-4">
-                        <View>
-                            <Text className="text-xl font-bold" style={{ color: COLORS.dark }}>
-                                🔥 Çok Satanlar
-                            </Text>
-                            <Text className="text-xs mt-1" style={{ color: COLORS.gray }}>
-                                En çok tercih edilen ürünler
-                            </Text>
+                    {categories.length > 0 ? (
+                        <View className="flex-row flex-wrap justify-between">
+                            {categories.slice(0, 8).map((category) => (
+                                <View key={category.id} className="w-1/4 mb-4">
+                                    <CategoryCard category={category} />
+                                </View>
+                            ))}
                         </View>
-                        <TouchableOpacity activeOpacity={0.7}>
-                            <Text style={{ color: COLORS.primary }} className="font-semibold text-sm">
-                                Tümü
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        className="pl-4"
-                        contentContainerStyle={{ paddingRight: 16 }}
-                    >
-                        {bestSellingProducts.map((product) => (
-                            <View key={product.id} className="mr-3">
-                                <ProductCard product={product} />
-                            </View>
-                        ))}
-                    </ScrollView>
+                    ) : (
+                        <View className="py-8 items-center">
+                            <Text style={{ color: COLORS.gray }}>Kategori bulunamadı</Text>
+                        </View>
+                    )}
                 </View>
 
-                {/* 7. ÖZEL SEÇİMLER / KAMPANYALAR */}
+                {/* Best Sellers */}
+                {bestSellingProducts.length > 0 && (
+                    <View className="mt-6">
+                        <View className="px-4 flex-row items-center justify-between mb-4">
+                            <View>
+                                <Text className="text-xl font-bold" style={{ color: COLORS.dark }}>
+                                    🔥 Çok Satanlar
+                                </Text>
+                                <Text className="text-xs mt-1" style={{ color: COLORS.gray }}>
+                                    En çok tercih edilen ürünler
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => router.push('/best-sellers')}
+                            >
+                                <Text style={{ color: COLORS.primary }} className="font-semibold text-sm">
+                                    Tümü
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            className="pl-4"
+                            contentContainerStyle={{ paddingRight: 16 }}
+                        >
+                            {bestSellingProducts.map((product) => (
+                                <View key={product.id} className="mr-3">
+                                    <ProductCard product={product} />
+                                </View>
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
+
+                {/* Featured Products */}
                 {featuredProducts.length > 0 && (
                     <View className="px-4 mt-6 mb-6">
                         <View className="flex-row items-center justify-between mb-4">
@@ -270,20 +341,28 @@ export default function HomeScreen() {
                                     Size özel seçtiklerimiz
                                 </Text>
                             </View>
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => router.push('/featured')}
+                            >
+                                <Text style={{ color: COLORS.primary }} className="font-semibold text-sm">
+                                    Tümü
+                                </Text>
+                            </TouchableOpacity>
                         </View>
 
-                        <View className="flex-row flex-wrap -mx-2">
+                        <View className="flex-row flex-wrap justify-between">
                             {featuredProducts.slice(0, 6).map((product) => (
-                                <View key={product.id} className="w-1/2 px-2 mb-4">
-                                    <ProductCard product={product} />
+                                <View key={product.id} className="mb-4" style={{ width: '48%' }}>
+                                    <ProductCard product={product} width={undefined} />
                                 </View>
                             ))}
                         </View>
                     </View>
                 )}
 
-                {/* Bottom Spacing */}
-                <View className="h-6" />
+                {/* Bottom Spacing for Tab Bar */}
+                <View className="h-24" />
             </ScrollView>
         </SafeAreaView>
     );

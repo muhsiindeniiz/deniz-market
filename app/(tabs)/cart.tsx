@@ -1,28 +1,165 @@
 // app/(tabs)/cart.tsx
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Alert, TextInput, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Alert, TextInput, Modal, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '@/lib/supabase';
 import { useCartStore } from '@/store/cartStore';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import { COLORS, FREE_DELIVERY_THRESHOLD, DELIVERY_FEE } from '@/lib/constants';
+import { Coupon } from '@/lib/types';
 
 export default function CartScreen() {
     const router = useRouter();
     const { items, removeItem, updateQuantity, getTotal, clearCart } = useCartStore();
     const { isAuthenticated } = useAuthStore();
     const { showToast } = useToast();
+
     const [promoCode, setPromoCode] = useState('');
+    const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
     const [discount, setDiscount] = useState(0);
     const [couponModalVisible, setCouponModalVisible] = useState(false);
     const [couponInput, setCouponInput] = useState('');
+    const [couponLoading, setCouponLoading] = useState(false);
+    const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
 
     const subtotal = getTotal();
     const deliveryFee = subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
     const total = subtotal - discount + deliveryFee;
     const remainingForFreeDelivery = FREE_DELIVERY_THRESHOLD - subtotal;
+
+    useEffect(() => {
+        loadAvailableCoupons();
+    }, []);
+
+    // Kupon uygulandığında veya sepet değiştiğinde indirimi yeniden hesapla
+    useEffect(() => {
+        if (appliedCoupon) {
+            calculateDiscount(appliedCoupon);
+        }
+    }, [subtotal, appliedCoupon]);
+
+    const loadAvailableCoupons = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('coupons')
+                .select('*')
+                .eq('is_active', true)
+                .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
+                .order('discount_value', { ascending: false });
+
+            if (error) throw error;
+            if (data) setAvailableCoupons(data);
+        } catch (error) {
+            console.error('Error loading coupons:', error);
+        }
+    };
+
+    const calculateDiscount = (coupon: Coupon) => {
+        if (subtotal < coupon.min_order_amount) {
+            setDiscount(0);
+            return;
+        }
+
+        let discountAmount = 0;
+        if (coupon.discount_type === 'percentage') {
+            discountAmount = (subtotal * coupon.discount_value) / 100;
+        } else {
+            discountAmount = coupon.discount_value;
+        }
+
+        // İndirim tutarı sepet toplamını geçemez
+        discountAmount = Math.min(discountAmount, subtotal);
+        setDiscount(discountAmount);
+    };
+
+    const handleApplyCoupon = async () => {
+        if (!couponInput.trim()) {
+            showToast('Lütfen kupon kodu girin', 'warning');
+            return;
+        }
+
+        setCouponLoading(true);
+
+        try {
+            const { data, error } = await supabase
+                .from('coupons')
+                .select('*')
+                .eq('code', couponInput.toUpperCase())
+                .eq('is_active', true)
+                .single();
+
+            if (error || !data) {
+                showToast('Geçersiz kupon kodu', 'error');
+                setCouponLoading(false);
+                return;
+            }
+
+            const coupon = data as Coupon;
+
+            // Geçerlilik tarihi kontrolü
+            if (coupon.valid_until && new Date(coupon.valid_until) < new Date()) {
+                showToast('Bu kuponun süresi dolmuş', 'error');
+                setCouponLoading(false);
+                return;
+            }
+
+            // Kullanım limiti kontrolü
+            if (coupon.max_uses !== null && coupon.current_uses >= coupon.max_uses) {
+                showToast('Bu kupon kullanım limitine ulaşmış', 'error');
+                setCouponLoading(false);
+                return;
+            }
+
+            // Minimum sipariş tutarı kontrolü
+            if (subtotal < coupon.min_order_amount) {
+                showToast(
+                    `Bu kuponu kullanmak için minimum ₺${coupon.min_order_amount.toFixed(2)} tutarında sipariş vermelisiniz`,
+                    'warning'
+                );
+                setCouponLoading(false);
+                return;
+            }
+
+            // Kupon uygula
+            setAppliedCoupon(coupon);
+            setPromoCode(coupon.code);
+            calculateDiscount(coupon);
+            setCouponModalVisible(false);
+            setCouponInput('');
+            showToast('Kupon kodu başarıyla uygulandı!', 'success');
+        } catch (error) {
+            console.error('Error applying coupon:', error);
+            showToast('Kupon uygulanırken bir hata oluştu', 'error');
+        } finally {
+            setCouponLoading(false);
+        }
+    };
+
+    const handleRemoveCoupon = () => {
+        setAppliedCoupon(null);
+        setPromoCode('');
+        setDiscount(0);
+        showToast('Kupon kaldırıldı', 'info');
+    };
+
+    const handleSelectCoupon = (coupon: Coupon) => {
+        if (subtotal < coupon.min_order_amount) {
+            showToast(
+                `Bu kuponu kullanmak için minimum ₺${coupon.min_order_amount.toFixed(2)} tutarında sipariş vermelisiniz`,
+                'warning'
+            );
+            return;
+        }
+
+        setAppliedCoupon(coupon);
+        setPromoCode(coupon.code);
+        calculateDiscount(coupon);
+        setCouponModalVisible(false);
+        showToast('Kupon kodu başarıyla uygulandı!', 'success');
+    };
 
     const handleCheckout = () => {
         if (!isAuthenticated) {
@@ -55,30 +192,11 @@ export default function CartScreen() {
         );
     };
 
-    const handleApplyCoupon = () => {
-        if (!couponInput.trim()) {
-            showToast('Lütfen kupon kodu girin', 'warning');
-            return;
+    const formatDiscountText = (coupon: Coupon): string => {
+        if (coupon.discount_type === 'percentage') {
+            return `%${coupon.discount_value} indirim`;
         }
-
-        // Örnek kupon kodları
-        const validCoupons: { [key: string]: number } = {
-            'INDIRIM10': 10,
-            'INDIRIM20': 20,
-            'DENIZ50': 50,
-        };
-
-        const discountAmount = validCoupons[couponInput.toUpperCase()];
-
-        if (discountAmount) {
-            setDiscount(discountAmount);
-            setPromoCode(couponInput.toUpperCase());
-            setCouponModalVisible(false);
-            setCouponInput('');
-            showToast('Kupon kodu başarıyla uygulandı!', 'success');
-        } else {
-            showToast('Geçersiz kupon kodu', 'error');
-        }
+        return `₺${coupon.discount_value} indirim`;
     };
 
     if (items.length === 0) {
@@ -117,7 +235,7 @@ export default function CartScreen() {
     }
 
     return (
-        <SafeAreaView className='flex-1' style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 border-b border-gray-200">
                 <View className="flex-row items-center justify-between">
@@ -130,7 +248,16 @@ export default function CartScreen() {
                             'Tüm ürünler sepetten kaldırılacak. Emin misiniz?',
                             [
                                 { text: 'İptal', style: 'cancel' },
-                                { text: 'Temizle', style: 'destructive', onPress: clearCart },
+                                {
+                                    text: 'Temizle',
+                                    style: 'destructive',
+                                    onPress: () => {
+                                        clearCart();
+                                        setAppliedCoupon(null);
+                                        setDiscount(0);
+                                        setPromoCode('');
+                                    }
+                                },
                             ]
                         );
                     }}>
@@ -162,7 +289,7 @@ export default function CartScreen() {
 
                         return (
                             <View
-                                key={item.id}
+                                key={item.product.id}
                                 className="bg-white rounded-2xl p-4 mb-3 flex-row"
                                 style={{
                                     shadowColor: '#000',
@@ -173,7 +300,7 @@ export default function CartScreen() {
                                 }}
                             >
                                 <Image
-                                    source={{ uri: item.product.images[0] }}
+                                    source={{ uri: item.product.images?.[0] || 'https://via.placeholder.com/100' }}
                                     className="w-24 h-24 rounded-xl"
                                     resizeMode="cover"
                                 />
@@ -260,41 +387,44 @@ export default function CartScreen() {
                 </View>
 
                 {/* Promo Code */}
-                <View className="px-4 mb-4">
-                    <TouchableOpacity
-                        onPress={() => setCouponModalVisible(true)}
-                        className="bg-white rounded-2xl p-4 flex-row items-center justify-between"
-                    >
-                        <View className="flex-row items-center flex-1">
-                            <View
-                                className="w-12 h-12 rounded-xl items-center justify-center mr-3"
-                                style={{ backgroundColor: COLORS.primary + '20' }}
-                            >
-                                <Ionicons name="pricetag" size={24} color={COLORS.primary} />
+                {!appliedCoupon ? (
+                    <View className="px-4 mb-4">
+                        <TouchableOpacity
+                            onPress={() => setCouponModalVisible(true)}
+                            className="bg-white rounded-2xl p-4 flex-row items-center justify-between"
+                        >
+                            <View className="flex-row items-center flex-1">
+                                <View
+                                    className="w-12 h-12 rounded-xl items-center justify-center mr-3"
+                                    style={{ backgroundColor: COLORS.primary + '20' }}
+                                >
+                                    <Ionicons name="pricetag" size={24} color={COLORS.primary} />
+                                </View>
+                                <Text className="text-base font-medium" style={{ color: COLORS.dark }}>
+                                    Kupon Kodu Var mı?
+                                </Text>
                             </View>
-                            <Text className="text-base font-medium" style={{ color: COLORS.dark }}>
-                                Kupon Kodu Var mı?
-                            </Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Applied Coupon */}
-                {discount > 0 && (
+                            <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    /* Applied Coupon */
                     <View className="mx-4 mb-4 bg-green-50 rounded-2xl p-4 border border-green-200">
                         <View className="flex-row items-center justify-between">
                             <View className="flex-row items-center flex-1">
                                 <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
-                                <View className="ml-3">
+                                <View className="ml-3 flex-1">
                                     <Text className="font-semibold" style={{ color: COLORS.dark }}>
-                                        Tebrikler!
+                                        {appliedCoupon.code}
                                     </Text>
                                     <Text className="text-sm" style={{ color: COLORS.gray }}>
-                                        Siparişinizde ₺{discount.toFixed(2)} tasarruf ediyorsunuz!
+                                        {formatDiscountText(appliedCoupon)} - ₺{discount.toFixed(2)} tasarruf
                                     </Text>
                                 </View>
                             </View>
+                            <TouchableOpacity onPress={handleRemoveCoupon}>
+                                <Ionicons name="close-circle" size={24} color={COLORS.danger} />
+                            </TouchableOpacity>
                         </View>
                     </View>
                 )}
@@ -314,7 +444,7 @@ export default function CartScreen() {
 
                     {discount > 0 && (
                         <View className="flex-row justify-between mb-2">
-                            <Text style={{ color: COLORS.primary }}>İndirim</Text>
+                            <Text style={{ color: COLORS.primary }}>İndirim ({promoCode})</Text>
                             <Text className="font-semibold" style={{ color: COLORS.primary }}>
                                 -₺{discount.toFixed(2)}
                             </Text>
@@ -364,13 +494,14 @@ export default function CartScreen() {
             {/* Coupon Modal */}
             <Modal
                 visible={couponModalVisible}
-                transparent
-                animationType="fade"
+                transparent={true}
+                animationType="slide"
                 onRequestClose={() => setCouponModalVisible(false)}
             >
-                <View className="flex-1 justify-center items-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                    <View className="bg-white rounded-3xl mx-6 p-6" style={{ width: '85%', maxWidth: 400 }}>
-                        <View className="flex-row items-center justify-between mb-4">
+                <View className="flex-1 justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <View className="bg-white rounded-t-3xl" style={{ maxHeight: '80%' }}>
+                        {/* Modal Header */}
+                        <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-200">
                             <Text className="text-xl font-bold" style={{ color: COLORS.dark }}>
                                 Kupon Kodu
                             </Text>
@@ -379,47 +510,108 @@ export default function CartScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        <Text className="text-sm mb-4" style={{ color: COLORS.gray }}>
-                            Kupon kodunuzu girerek indirimden yararlanın
-                        </Text>
+                        <ScrollView className="px-6 py-4">
+                            {/* Input Section */}
+                            <View className="mb-6">
+                                <Text className="text-sm mb-2" style={{ color: COLORS.gray }}>
+                                    Kupon kodunuzu girerek indirimden yararlanın
+                                </Text>
 
-                        <View className="mb-4">
-                            <View className="flex-row items-center bg-gray-100 rounded-xl px-4 py-3 border border-gray-200">
-                                <TextInput
-                                    placeholder="Kupon kodunu girin"
-                                    value={couponInput}
-                                    onChangeText={setCouponInput}
-                                    autoCapitalize="characters"
-                                    className="flex-1 text-base"
-                                    placeholderTextColor={COLORS.gray}
-                                />
+                                <View className="flex-row items-center">
+                                    <View className="flex-1 flex-row items-center bg-gray-100 rounded-xl px-4 py-3 border border-gray-200 mr-3">
+                                        <TextInput
+                                            placeholder="Kupon kodunu girin"
+                                            value={couponInput}
+                                            onChangeText={setCouponInput}
+                                            autoCapitalize="characters"
+                                            className="flex-1 text-base"
+                                            placeholderTextColor={COLORS.gray}
+                                            style={{ color: COLORS.dark }}
+                                        />
+                                    </View>
+                                    <TouchableOpacity
+                                        onPress={handleApplyCoupon}
+                                        disabled={couponLoading}
+                                        className="rounded-xl px-6 py-3"
+                                        style={{ backgroundColor: COLORS.primary }}
+                                    >
+                                        {couponLoading ? (
+                                            <ActivityIndicator size="small" color="#FFF" />
+                                        ) : (
+                                            <Text className="text-white font-semibold">Uygula</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
                             </View>
-                        </View>
 
-                        <View className="bg-blue-50 rounded-2xl p-4 mb-4 border border-blue-200">
-                            <Text className="text-xs font-semibold mb-2" style={{ color: COLORS.dark }}>
-                                Örnek Kupon Kodları:
-                            </Text>
-                            <Text className="text-xs mb-1" style={{ color: COLORS.gray }}>
-                                • INDIRIM10 - ₺10 indirim
-                            </Text>
-                            <Text className="text-xs mb-1" style={{ color: COLORS.gray }}>
-                                • INDIRIM20 - ₺20 indirim
-                            </Text>
-                            <Text className="text-xs" style={{ color: COLORS.gray }}>
-                                • DENIZ50 - ₺50 indirim
-                            </Text>
-                        </View>
+                            {/* Available Coupons */}
+                            {availableCoupons.length > 0 && (
+                                <View>
+                                    <Text className="text-lg font-semibold mb-3" style={{ color: COLORS.dark }}>
+                                        Kullanılabilir Kuponlar
+                                    </Text>
 
-                        <TouchableOpacity
-                            onPress={handleApplyCoupon}
-                            className="rounded-xl py-4"
-                            style={{ backgroundColor: COLORS.primary }}
-                        >
-                            <Text className="text-white text-center text-base font-semibold">
-                                Uygula
-                            </Text>
-                        </TouchableOpacity>
+                                    {availableCoupons.map((coupon) => {
+                                        const isEligible = subtotal >= coupon.min_order_amount;
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={coupon.id}
+                                                onPress={() => handleSelectCoupon(coupon)}
+                                                disabled={!isEligible}
+                                                className="rounded-2xl p-4 mb-3 border-2"
+                                                style={{
+                                                    borderColor: isEligible ? COLORS.primary : COLORS.gray + '40',
+                                                    backgroundColor: isEligible ? COLORS.primary + '10' : COLORS.gray + '10',
+                                                    opacity: isEligible ? 1 : 0.6,
+                                                }}
+                                            >
+                                                <View className="flex-row items-center justify-between">
+                                                    <View className="flex-1">
+                                                        <View className="flex-row items-center mb-1">
+                                                            <View
+                                                                className="px-3 py-1 rounded-full mr-2"
+                                                                style={{ backgroundColor: COLORS.primary }}
+                                                            >
+                                                                <Text className="text-white font-bold text-sm">
+                                                                    {coupon.code}
+                                                                </Text>
+                                                            </View>
+                                                            <Text className="font-bold" style={{ color: COLORS.dark }}>
+                                                                {formatDiscountText(coupon)}
+                                                            </Text>
+                                                        </View>
+
+                                                        {coupon.min_order_amount > 0 && (
+                                                            <Text className="text-sm" style={{ color: COLORS.gray }}>
+                                                                Min. sipariş: ₺{coupon.min_order_amount.toFixed(2)}
+                                                                {!isEligible && (
+                                                                    <Text style={{ color: COLORS.danger }}>
+                                                                        {' '}(₺{(coupon.min_order_amount - subtotal).toFixed(2)} daha gerekli)
+                                                                    </Text>
+                                                                )}
+                                                            </Text>
+                                                        )}
+
+                                                        {coupon.valid_until && (
+                                                            <Text className="text-xs mt-1" style={{ color: COLORS.gray }}>
+                                                                Son geçerlilik: {new Date(coupon.valid_until).toLocaleDateString('tr-TR')}
+                                                            </Text>
+                                                        )}
+                                                    </View>
+
+                                                    {isEligible && (
+                                                        <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
+                                                    )}
+                                                </View>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            )}
+
+                            <View className="h-6" />
+                        </ScrollView>
                     </View>
                 </View>
             </Modal>

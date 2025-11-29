@@ -197,7 +197,7 @@ export default function AddressesScreen() {
                                     )}
 
                                     <TouchableOpacity
-                                        onPress={() => router.push(`/edit-address/${address.id}`)}
+                                        onPress={() => router.push({ pathname: '/edit-address/[id]', params: { id: address.id } })}
                                         className="flex-1 rounded-xl py-3 mx-1"
                                         style={{ backgroundColor: COLORS.primary }}
                                     >

@@ -1,14 +1,16 @@
 // app/(screens)/product/[id].tsx
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Dimensions, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
-import { Product, Review } from '@/lib/types';
+import { Product, Review, Category, Store, User } from '@/lib/types';
 import { useCartStore } from '@/store/cartStore';
+import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import { COLORS } from '@/lib/constants';
+import { Pressable } from 'react-native-gesture-handler';
 
 const { width } = Dimensions.get('window');
 const DESCRIPTION_LINES = 3;
@@ -16,17 +18,10 @@ const DESCRIPTION_LINES = 3;
 // Skeleton Component
 const ProductDetailSkeleton = () => (
     <ScrollView className="flex-1">
-        {/* Image Skeleton */}
         <View style={{ width, height: width, backgroundColor: COLORS.gray + '30' }} />
-
         <View className="p-4">
-            {/* Title Skeleton */}
             <View style={{ width: '80%', height: 28, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 12 }} />
-
-            {/* Rating Skeleton */}
             <View style={{ width: '50%', height: 20, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 16 }} />
-
-            {/* Store Info Skeleton */}
             <View className="flex-row items-center mb-4 pb-4 border-b border-gray-200">
                 <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.gray + '30', marginRight: 12 }} />
                 <View className="flex-1">
@@ -34,20 +29,10 @@ const ProductDetailSkeleton = () => (
                     <View style={{ width: '40%', height: 14, backgroundColor: COLORS.gray + '30', borderRadius: 4 }} />
                 </View>
             </View>
-
-            {/* Description Skeleton */}
             <View style={{ width: '40%', height: 20, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 12 }} />
             <View style={{ width: '100%', height: 16, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 8 }} />
             <View style={{ width: '100%', height: 16, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 8 }} />
             <View style={{ width: '70%', height: 16, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 16 }} />
-
-            {/* Details Box Skeleton */}
-            <View className="bg-gray-50 rounded-2xl p-4 mb-4">
-                <View style={{ width: '50%', height: 20, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 12 }} />
-                <View style={{ width: '100%', height: 16, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 8 }} />
-                <View style={{ width: '100%', height: 16, backgroundColor: COLORS.gray + '30', borderRadius: 4, marginBottom: 8 }} />
-                <View style={{ width: '100%', height: 16, backgroundColor: COLORS.gray + '30', borderRadius: 4 }} />
-            </View>
         </View>
     </ScrollView>
 );
@@ -56,13 +41,16 @@ export default function ProductDetailScreen() {
     const router = useRouter();
     const { id } = useLocalSearchParams();
     const addItem = useCartStore((state) => state.addItem);
+    const { user, isAuthenticated } = useAuthStore();
     const { showToast } = useToast();
+
     const [product, setProduct] = useState<Product | null>(null);
     const [reviews, setReviews] = useState<Review[]>([]);
     const [loading, setLoading] = useState(true);
     const [quantity, setQuantity] = useState(1);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const [isFavorite, setIsFavorite] = useState(false);
+    const [favoriteLoading, setFavoriteLoading] = useState(false);
     const [showFullDescription, setShowFullDescription] = useState(false);
     const [shouldShowReadMore, setShouldShowReadMore] = useState(false);
 
@@ -70,104 +58,134 @@ export default function ProductDetailScreen() {
         loadProductData();
     }, [id]);
 
-    // app/(screens)/product/[id].tsx
+    useEffect(() => {
+        if (isAuthenticated && user?.id && id) {
+            checkFavoriteStatus();
+        }
+    }, [isAuthenticated, user?.id, id]);
+
+    const checkFavoriteStatus = async () => {
+        if (!user?.id || !id) return;
+
+        try {
+            const { data } = await supabase
+                .from('favorites')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('product_id', id)
+                .maybeSingle();
+
+            setIsFavorite(!!data);
+        } catch (error) {
+            setIsFavorite(false);
+        }
+    };
+
     const loadProductData = async () => {
         try {
             setLoading(true);
 
-            console.log('Loading product with ID:', id);
-
             const { data: productData, error: productError } = await supabase
                 .from('products')
                 .select(`
-                id,
-                name,
-                description,
-                price,
-                discount_price,
-                category_id,
-                store_id,
-                images,
-                stock,
-                unit,
-                weight,
-                rating,
-                review_count,
-                is_featured,
-                is_on_sale,
-                created_at,
-                updated_at,
-                category:categories (
-                    id,
-                    name,
-                    icon,
-                    image_url,
-                    color,
-                    item_count,
-                    created_at
-                ),
-                store:stores (
-                    id,
-                    name,
-                    description,
-                    logo,
-                    banner_image,
-                    address,
-                    phone,
-                    email,
-                    rating,
-                    review_count,
-                    is_active,
-                    created_at,
-                    updated_at
-                )
-            `)
+                    *,
+                    category:categories (*),
+                    store:stores (*)
+                `)
                 .eq('id', id)
                 .single();
 
-            if (productError) {
-                console.error('Product error:', productError);
-                throw productError;
-            }
-
-            console.log('Product data loaded:', productData);
+            if (productError) throw productError;
 
             if (productData) {
+                const categoryData = Array.isArray(productData.category)
+                    ? productData.category[0]
+                    : productData.category;
+
+                const storeData = Array.isArray(productData.store)
+                    ? productData.store[0]
+                    : productData.store;
+
                 const formattedProduct: Product = {
-                    ...productData,
-                    category: Array.isArray(productData.category) ? productData.category[0] : productData.category,
-                    store: Array.isArray(productData.store) ? productData.store[0] : productData.store,
+                    id: productData.id,
+                    name: productData.name,
+                    description: productData.description,
+                    price: productData.price,
+                    discount_price: productData.discount_price,
+                    category_id: productData.category_id,
+                    store_id: productData.store_id,
+                    images: productData.images || [],
+                    stock: productData.stock,
+                    unit: productData.unit,
+                    weight: productData.weight,
+                    rating: productData.rating,
+                    review_count: productData.review_count,
+                    is_featured: productData.is_featured,
+                    is_on_sale: productData.is_on_sale,
+                    created_at: productData.created_at,
+                    updated_at: productData.updated_at,
+                    category: categoryData ? {
+                        id: categoryData.id,
+                        name: categoryData.name,
+                        icon: categoryData.icon,
+                        color: categoryData.color,
+                        item_count: categoryData.item_count,
+                        image_url: categoryData.image_url,
+                        created_at: categoryData.created_at,
+                        updated_at: categoryData.updated_at,
+                    } : undefined,
+                    store: storeData ? {
+                        id: storeData.id,
+                        name: storeData.name,
+                        description: storeData.description,
+                        logo: storeData.logo,
+                        banner_image: storeData.banner_image,
+                        address: storeData.address,
+                        phone: storeData.phone,
+                        email: storeData.email,
+                        rating: storeData.rating,
+                        review_count: storeData.review_count,
+                        is_active: storeData.is_active,
+                        created_at: storeData.created_at,
+                        updated_at: storeData.updated_at,
+                    } : undefined,
                 };
                 setProduct(formattedProduct);
             }
 
+            // Load reviews
             const { data: reviewsData } = await supabase
                 .from('reviews')
                 .select(`
-                id,
-                product_id,
-                user_id,
-                rating,
-                comment,
-                created_at,
-                user:users (
-                    id,
-                    email,
-                    full_name,
-                    phone,
-                    created_at,
-                    updated_at
-                )
-            `)
+                    *,
+                    user:users (*)
+                `)
                 .eq('product_id', id)
                 .order('created_at', { ascending: false })
                 .limit(3);
 
             if (reviewsData) {
-                const formattedReviews: Review[] = reviewsData.map(review => ({
-                    ...review,
-                    user: Array.isArray(review.user) ? review.user[0] : review.user,
-                }));
+                const formattedReviews: Review[] = reviewsData.map(review => {
+                    const userData = Array.isArray(review.user) ? review.user[0] : review.user;
+
+                    return {
+                        id: review.id,
+                        product_id: review.product_id,
+                        user_id: review.user_id,
+                        rating: review.rating,
+                        comment: review.comment,
+                        created_at: review.created_at,
+                        user: userData ? {
+                            id: userData.id,
+                            email: userData.email,
+                            full_name: userData.full_name,
+                            phone: userData.phone,
+                            birth_date: userData.birth_date,
+                            created_at: userData.created_at,
+                            updated_at: userData.updated_at,
+                        } : undefined,
+                    };
+                });
                 setReviews(formattedReviews);
             }
         } catch (error) {
@@ -175,6 +193,50 @@ export default function ProductDetailScreen() {
             showToast('Ürün yüklenirken hata oluştu', 'error');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleToggleFavorite = async () => {
+        if (!isAuthenticated) {
+            showToast('Favorilere eklemek için giriş yapın', 'warning');
+            router.push('/(auth)/login');
+            return;
+        }
+
+        if (!user?.id || !product?.id) return;
+
+        setFavoriteLoading(true);
+
+        try {
+            if (isFavorite) {
+                const { error } = await supabase
+                    .from('favorites')
+                    .delete()
+                    .eq('user_id', user.id)
+                    .eq('product_id', product.id);
+
+                if (error) throw error;
+
+                setIsFavorite(false);
+                showToast('Favorilerden kaldırıldı', 'success');
+            } else {
+                const { error } = await supabase
+                    .from('favorites')
+                    .insert({
+                        user_id: user.id,
+                        product_id: product.id,
+                    });
+
+                if (error) throw error;
+
+                setIsFavorite(true);
+                showToast('Favorilere eklendi', 'success');
+            }
+        } catch (error) {
+            console.error('Error toggling favorite:', error);
+            showToast('Bir hata oluştu', 'error');
+        } finally {
+            setFavoriteLoading(false);
         }
     };
 
@@ -198,7 +260,7 @@ export default function ProductDetailScreen() {
 
     if (loading) {
         return (
-            <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.white }}>
+            <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.white }}>
                 <View className="px-4 py-3 flex-row items-center justify-between border-b border-gray-200">
                     <TouchableOpacity onPress={() => router.back()}>
                         <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
@@ -217,7 +279,7 @@ export default function ProductDetailScreen() {
 
     if (!product) {
         return (
-            <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
+            <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
                 <View className="px-4 py-3 flex-row items-center justify-between border-b border-gray-200">
                     <TouchableOpacity onPress={() => router.back()}>
                         <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
@@ -251,21 +313,16 @@ export default function ProductDetailScreen() {
     const isMinQuantity = quantity <= 1;
     const isMaxQuantity = quantity >= product.stock;
 
-    console.log('Rendering product:', product.name);
-    console.log('Store data:', product.store);
-
     return (
-        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.white }}>
+        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.white }}>
             {/* Header */}
             <View className="px-4 py-3 flex-row items-center justify-between border-b border-gray-200">
                 <TouchableOpacity onPress={() => router.back()}>
                     <Ionicons name="arrow-back" size={24} color={COLORS.dark} />
                 </TouchableOpacity>
-
                 <Text className="text-lg font-semibold" style={{ color: COLORS.dark }}>
                     Ürün Detayı
                 </Text>
-
                 <TouchableOpacity onPress={() => router.push('/cart')}>
                     <Ionicons name="cart-outline" size={24} color={COLORS.dark} />
                 </TouchableOpacity>
@@ -311,23 +368,51 @@ export default function ProductDetailScreen() {
                     )}
 
                     {/* Favorite Button */}
-                    <TouchableOpacity
-                        onPress={() => setIsFavorite(!isFavorite)}
-                        className="absolute top-4 right-4 w-12 h-12 rounded-full bg-white items-center justify-center"
-                        style={{
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.1,
-                            shadowRadius: 8,
-                            elevation: 3,
-                        }}
+                    <Pressable
+                        onPress={handleToggleFavorite}
+                        disabled={favoriteLoading}
+                        style={({ pressed }) => [
+                            {
+                                position: 'absolute',
+                                top: 16,
+                                right: 16,
+                                width: 48,
+                                height: 48,
+                                borderRadius: 24,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: COLORS.white,
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.15,
+                                shadowRadius: 8,
+                                elevation: 4,
+                                opacity: pressed ? 0.8 : 1,
+                            },
+                        ]}
                     >
-                        <Ionicons
-                            name={isFavorite ? 'heart' : 'heart-outline'}
-                            size={24}
-                            color={isFavorite ? COLORS.danger : COLORS.dark}
-                        />
-                    </TouchableOpacity>
+                        {favoriteLoading ? (
+                            <ActivityIndicator size="small" color={COLORS.danger} />
+                        ) : (
+                            <Ionicons
+                                name={isFavorite ? 'heart' : 'heart-outline'}
+                                size={26}
+                                color={isFavorite ? COLORS.danger : COLORS.dark}
+                            />
+                        )}
+                    </Pressable>
+
+                    {/* Discount Badge */}
+                    {hasDiscount && (
+                        <View
+                            className="absolute top-4 left-4 px-3 py-1 rounded-full"
+                            style={{ backgroundColor: COLORS.danger }}
+                        >
+                            <Text className="text-white font-bold text-sm">
+                                %{Math.round(((product.price - product.discount_price!) / product.price) * 100)} İndirim
+                            </Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Product Info */}
@@ -352,7 +437,7 @@ export default function ProductDetailScreen() {
                         </View>
                     </View>
 
-                    {/* Store Info - DÜZELTME */}
+                    {/* Store Info */}
                     {product.store && (
                         <TouchableOpacity
                             onPress={handleStorePress}
@@ -388,43 +473,33 @@ export default function ProductDetailScreen() {
                         </TouchableOpacity>
                     )}
 
-                    {/* Eğer store yoksa gösterelim (debug için) */}
-                    {!product.store && (
-                        <View className="bg-yellow-50 rounded-2xl p-4 mb-4 border border-yellow-200">
-                            <View className="flex-row items-center">
-                                <Ionicons name="warning" size={20} color={COLORS.warning} />
-                                <Text className="ml-2 text-sm" style={{ color: COLORS.dark }}>
-                                    Bu ürün henüz bir mağazaya atanmamış
-                                </Text>
-                            </View>
+                    {/* Description */}
+                    {product.description && (
+                        <View className="mb-4">
+                            <Text className="text-lg font-semibold mb-2" style={{ color: COLORS.dark }}>
+                                Ürün Açıklaması
+                            </Text>
+                            <Text
+                                className="text-base leading-6"
+                                style={{ color: COLORS.gray }}
+                                numberOfLines={showFullDescription ? undefined : DESCRIPTION_LINES}
+                                onTextLayout={(e) => {
+                                    if (e.nativeEvent.lines.length > DESCRIPTION_LINES) {
+                                        setShouldShowReadMore(true);
+                                    }
+                                }}
+                            >
+                                {product.description}
+                            </Text>
+                            {shouldShowReadMore && (
+                                <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)} className="mt-2">
+                                    <Text style={{ color: COLORS.primary }} className="font-semibold">
+                                        {showFullDescription ? 'Daha az göster' : 'Devamını oku'}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
                     )}
-
-                    {/* Description */}
-                    <View className="mb-4">
-                        <Text className="text-lg font-semibold mb-2" style={{ color: COLORS.dark }}>
-                            Ürün Açıklaması
-                        </Text>
-                        <Text
-                            className="text-base leading-6"
-                            style={{ color: COLORS.gray }}
-                            numberOfLines={showFullDescription ? undefined : DESCRIPTION_LINES}
-                            onTextLayout={(e) => {
-                                if (e.nativeEvent.lines.length > DESCRIPTION_LINES) {
-                                    setShouldShowReadMore(true);
-                                }
-                            }}
-                        >
-                            {product.description}
-                        </Text>
-                        {shouldShowReadMore && (
-                            <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)} className="mt-2">
-                                <Text style={{ color: COLORS.primary }} className="font-semibold">
-                                    {showFullDescription ? 'Daha az göster' : 'Devamını oku'}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
 
                     {/* Product Details */}
                     <View className="bg-gray-50 rounded-2xl p-4 mb-4">

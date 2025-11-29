@@ -17,8 +17,6 @@ import { supabase } from '@/lib/supabase';
 import { Order } from '@/lib/types';
 import { COLORS, ORDER_STATUS_LABELS } from '@/lib/constants';
 
-const { width } = Dimensions.get('window');
-
 const ORDER_STEPS = [
     { id: 'pending', label: 'Sipariş Alındı', icon: 'checkmark-circle', color: '#10B981' },
     { id: 'processing', label: 'Hazırlanıyor', icon: 'restaurant', color: '#F59E0B' },

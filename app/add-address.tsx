@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,7 +32,6 @@ export default function AddAddressScreen() {
 
         setLoading(true);
         try {
-            // If this is the first address or marked as default, set others to non-default
             if (formData.is_default) {
                 await supabase
                     .from('addresses')
@@ -49,7 +48,6 @@ export default function AddAddressScreen() {
 
             if (error) throw error;
 
-            // Adresleri yeniden yükle
             if (user?.id) {
                 await refreshAddresses(user.id);
             }
@@ -64,7 +62,7 @@ export default function AddAddressScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 flex-row items-center border-b border-gray-200">
                 <TouchableOpacity onPress={() => router.back()} className="mr-3">
@@ -81,7 +79,7 @@ export default function AddAddressScreen() {
             >
                 <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
                     <View className="p-4">
-                        {/* Form fields - aynı kalacak */}
+                        {/* Address Title */}
                         <View className="mb-4">
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 Adres Başlığı *
@@ -90,11 +88,13 @@ export default function AddAddressScreen() {
                                 placeholder="Ev, İş, vb."
                                 value={formData.title}
                                 onChangeText={(text) => setFormData({ ...formData, title: text })}
-                                className="bg-white rounded-xl px-4 py-3 text-base border border-gray-200"
+                                className="bg-white rounded-xl border border-gray-200"
+                                style={styles.input}
                                 placeholderTextColor={COLORS.gray}
                             />
                         </View>
 
+                        {/* Full Address */}
                         <View className="mb-4">
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 Tam Adres *
@@ -103,7 +103,8 @@ export default function AddAddressScreen() {
                                 placeholder="Sokak, Mahalle, Bina No, Daire No"
                                 value={formData.full_address}
                                 onChangeText={(text) => setFormData({ ...formData, full_address: text })}
-                                className="bg-white rounded-xl px-4 py-3 text-base border border-gray-200"
+                                className="bg-white rounded-xl border border-gray-200"
+                                style={styles.multilineInput}
                                 placeholderTextColor={COLORS.gray}
                                 multiline
                                 numberOfLines={3}
@@ -111,6 +112,7 @@ export default function AddAddressScreen() {
                             />
                         </View>
 
+                        {/* City */}
                         <View className="mb-4">
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 Şehir *
@@ -119,11 +121,13 @@ export default function AddAddressScreen() {
                                 placeholder="İstanbul"
                                 value={formData.city}
                                 onChangeText={(text) => setFormData({ ...formData, city: text })}
-                                className="bg-white rounded-xl px-4 py-3 text-base border border-gray-200"
+                                className="bg-white rounded-xl border border-gray-200"
+                                style={styles.input}
                                 placeholderTextColor={COLORS.gray}
                             />
                         </View>
 
+                        {/* District */}
                         <View className="mb-4">
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 İlçe *
@@ -132,11 +136,13 @@ export default function AddAddressScreen() {
                                 placeholder="Kadıköy"
                                 value={formData.district}
                                 onChangeText={(text) => setFormData({ ...formData, district: text })}
-                                className="bg-white rounded-xl px-4 py-3 text-base border border-gray-200"
+                                className="bg-white rounded-xl border border-gray-200"
+                                style={styles.input}
                                 placeholderTextColor={COLORS.gray}
                             />
                         </View>
 
+                        {/* Postal Code */}
                         <View className="mb-4">
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 Posta Kodu
@@ -146,11 +152,13 @@ export default function AddAddressScreen() {
                                 value={formData.postal_code}
                                 onChangeText={(text) => setFormData({ ...formData, postal_code: text })}
                                 keyboardType="number-pad"
-                                className="bg-white rounded-xl px-4 py-3 text-base border border-gray-200"
+                                className="bg-white rounded-xl border border-gray-200"
+                                style={styles.input}
                                 placeholderTextColor={COLORS.gray}
                             />
                         </View>
 
+                        {/* Default Toggle */}
                         <TouchableOpacity
                             onPress={() => setFormData({ ...formData, is_default: !formData.is_default })}
                             className="bg-white rounded-xl p-4 flex-row items-center justify-between mb-6"
@@ -171,6 +179,7 @@ export default function AddAddressScreen() {
                             </View>
                         </TouchableOpacity>
 
+                        {/* Save Button */}
                         <TouchableOpacity
                             onPress={handleSave}
                             disabled={loading}
@@ -190,3 +199,19 @@ export default function AddAddressScreen() {
         </SafeAreaView>
     );
 }
+
+const styles = StyleSheet.create({
+    input: {
+        height: 50,
+        paddingHorizontal: 16,
+        fontSize: 16,
+        textAlignVertical: 'center',
+    },
+    multilineInput: {
+        minHeight: 80,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 12,
+        fontSize: 16,
+    },
+});

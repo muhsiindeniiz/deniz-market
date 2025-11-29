@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,7 +36,6 @@ export default function EditEmailScreen() {
 
         setLoading(true);
         try {
-            // First verify the current password
             const { error: signInError } = await supabase.auth.signInWithPassword({
                 email: user?.email || '',
                 password: currentPassword,
@@ -46,14 +45,12 @@ export default function EditEmailScreen() {
                 throw new Error('Mevcut şifre yanlış');
             }
 
-            // Update email
             const { error: updateError } = await supabase.auth.updateUser({
                 email: newEmail,
             });
 
             if (updateError) throw updateError;
 
-            // Update user profile
             const { data, error: profileError } = await supabase
                 .from('users')
                 .update({ email: newEmail, updated_at: new Date().toISOString() })
@@ -78,7 +75,7 @@ export default function EditEmailScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 flex-row items-center border-b border-gray-200">
                 <TouchableOpacity onPress={() => router.back()} className="mr-3">
@@ -111,7 +108,7 @@ export default function EditEmailScreen() {
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 Mevcut E-posta Adresi
                             </Text>
-                            <View className="bg-gray-100 rounded-xl px-4 py-3">
+                            <View className="bg-gray-100 rounded-xl px-4 justify-center" style={styles.readOnlyContainer}>
                                 <Text className="text-base" style={{ color: COLORS.gray }}>
                                     {user?.email}
                                 </Text>
@@ -123,13 +120,14 @@ export default function EditEmailScreen() {
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 Mevcut Şifre *
                             </Text>
-                            <View className="flex-row items-center bg-white rounded-xl px-4 py-3 border border-gray-200">
+                            <View className="flex-row items-center bg-white rounded-xl px-4 border border-gray-200" style={styles.inputContainer}>
                                 <TextInput
                                     placeholder="Mevcut şifrenizi girin"
                                     value={currentPassword}
                                     onChangeText={setCurrentPassword}
                                     secureTextEntry={!showPassword}
-                                    className="flex-1 text-base"
+                                    className="flex-1"
+                                    style={styles.inputWithIcon}
                                     placeholderTextColor={COLORS.gray}
                                 />
                                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
@@ -147,7 +145,7 @@ export default function EditEmailScreen() {
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 Yeni E-posta Adresi *
                             </Text>
-                            <View className="flex-row items-center bg-white rounded-xl px-4 py-3 border border-gray-200">
+                            <View className="flex-row items-center bg-white rounded-xl px-4 border border-gray-200" style={styles.inputContainer}>
                                 <Ionicons name="mail-outline" size={20} color={COLORS.gray} />
                                 <TextInput
                                     placeholder="yeni@email.com"
@@ -155,7 +153,8 @@ export default function EditEmailScreen() {
                                     onChangeText={setNewEmail}
                                     keyboardType="email-address"
                                     autoCapitalize="none"
-                                    className="flex-1 ml-3 text-base"
+                                    className="flex-1 ml-3"
+                                    style={styles.inputWithIcon}
                                     placeholderTextColor={COLORS.gray}
                                 />
                             </View>
@@ -192,3 +191,17 @@ export default function EditEmailScreen() {
         </SafeAreaView>
     );
 }
+
+const styles = StyleSheet.create({
+    inputContainer: {
+        height: 50,
+    },
+    inputWithIcon: {
+        fontSize: 16,
+        height: '100%',
+        textAlignVertical: 'center',
+    },
+    readOnlyContainer: {
+        height: 50,
+    },
+});

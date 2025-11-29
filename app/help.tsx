@@ -82,7 +82,7 @@ export default function HelpScreen() {
     ];
 
     return (
-        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 flex-row items-center border-b border-gray-200">
                 <TouchableOpacity onPress={() => router.back()} className="mr-3">
@@ -144,9 +144,11 @@ export default function HelpScreen() {
                                             borderBottomColor: '#F0F0F0',
                                         }}
                                     >
+                                        {/* Sadece başlık kısmı tıklanabilir */}
                                         <TouchableOpacity
                                             onPress={() => setExpandedIndex(isExpanded ? null : globalIndex)}
                                             className="px-6 py-4"
+                                            activeOpacity={0.7}
                                         >
                                             <View className="flex-row items-center justify-between">
                                                 <Text
@@ -161,13 +163,16 @@ export default function HelpScreen() {
                                                     color={COLORS.gray}
                                                 />
                                             </View>
+                                        </TouchableOpacity>
 
-                                            {isExpanded && (
-                                                <Text className="mt-3 text-sm leading-6" style={{ color: COLORS.gray }}>
+                                        {/* Cevap kısmı TouchableOpacity dışında */}
+                                        {isExpanded && (
+                                            <View className="px-6 pb-4">
+                                                <Text className="text-sm leading-6" style={{ color: COLORS.gray }}>
                                                     {item.answer}
                                                 </Text>
-                                            )}
-                                        </TouchableOpacity>
+                                            </View>
+                                        )}
                                     </View>
                                 );
                             })}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -50,7 +50,7 @@ export default function EditProfileScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1"style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
             {/* Header */}
             <View className="bg-white px-4 py-4 flex-row items-center border-b border-gray-200">
                 <TouchableOpacity onPress={() => router.back()} className="mr-3">
@@ -93,7 +93,8 @@ export default function EditProfileScreen() {
                                 placeholder="Adınız Soyadınız"
                                 value={formData.full_name}
                                 onChangeText={(text) => setFormData({ ...formData, full_name: text })}
-                                className="bg-white rounded-xl px-4 py-3 text-base border border-gray-200"
+                                className="bg-white rounded-xl border border-gray-200"
+                                style={styles.input}
                                 placeholderTextColor={COLORS.gray}
                             />
                         </View>
@@ -108,7 +109,8 @@ export default function EditProfileScreen() {
                                 value={formData.phone}
                                 onChangeText={(text) => setFormData({ ...formData, phone: text })}
                                 keyboardType="phone-pad"
-                                className="bg-white rounded-xl px-4 py-3 text-base border border-gray-200"
+                                className="bg-white rounded-xl border border-gray-200"
+                                style={styles.input}
                                 placeholderTextColor={COLORS.gray}
                             />
                         </View>
@@ -118,7 +120,7 @@ export default function EditProfileScreen() {
                             <Text className="text-sm font-semibold mb-2" style={{ color: COLORS.dark }}>
                                 E-posta Adresi
                             </Text>
-                            <View className="bg-gray-100 rounded-xl px-4 py-3 flex-row items-center justify-between">
+                            <View className="bg-gray-100 rounded-xl px-4 flex-row items-center justify-between" style={styles.readOnlyContainer}>
                                 <Text className="text-base" style={{ color: COLORS.gray }}>
                                     {user?.email}
                                 </Text>
@@ -150,3 +152,15 @@ export default function EditProfileScreen() {
         </SafeAreaView>
     );
 }
+
+const styles = StyleSheet.create({
+    input: {
+        height: 50,
+        paddingHorizontal: 16,
+        fontSize: 16,
+        textAlignVertical: 'center',
+    },
+    readOnlyContainer: {
+        height: 50,
+    },
+});
