@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Stack } from 'expo-router';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -17,14 +17,20 @@ SplashScreen.setOptions({
 });
 
 export default function RootLayout() {
-  const { checkAuth } = useAuthStore();
+  const { initialize, isInitialized, isLoading, isAuthenticated } = useAuthStore();
   const { visible, message, type, duration, hideToast } = useToast();
   const [appIsReady, setAppIsReady] = useState(false);
 
+  const segments = useSegments();
+  const router = useRouter();
+  const navigationState = useRootNavigationState();
+  const hasNavigated = useRef(false);
+
+  // Initialize app
   useEffect(() => {
-    const initialize = async () => {
+    const initializeApp = async () => {
       try {
-        await checkAuth();
+        await initialize();
       } catch (error) {
         console.warn('Initialization error:', error);
       } finally {
@@ -32,21 +38,52 @@ export default function RootLayout() {
       }
     };
 
-    initialize();
+    initializeApp();
   }, []);
 
+  // Protected route logic
+  useEffect(() => {
+    // Navigation hazır değilse bekle
+    if (!navigationState?.key) return;
+    if (!isInitialized || isLoading || !appIsReady) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+    const inOnboarding = segments[0] === '(onboarding)';
+    const inProtectedRoute = segments[0] === '(tabs)';
+
+    // Zaten doğru yerdeyse navigate etme
+    if (isAuthenticated && inProtectedRoute) return;
+    if (!isAuthenticated && (inOnboarding || inAuthGroup)) return;
+
+    // Sadece bir kez navigate et
+    if (hasNavigated.current) return;
+
+    if (!isAuthenticated && inProtectedRoute) {
+      hasNavigated.current = true;
+      router.replace('/(onboarding)');
+    } else if (isAuthenticated && (inAuthGroup || inOnboarding)) {
+      hasNavigated.current = true;
+      router.replace('/(tabs)');
+    }
+  }, [isAuthenticated, isLoading, isInitialized, segments, navigationState?.key, appIsReady]);
+
+  // Auth state değiştiğinde flag'i resetle
+  useEffect(() => {
+    hasNavigated.current = false;
+  }, [isAuthenticated]);
+
   const onLayoutRootView = useCallback(async () => {
-    if (appIsReady) {
+    if (appIsReady && isInitialized && !isLoading) {
       await SplashScreen.hideAsync();
     }
-  }, [appIsReady]);
+  }, [appIsReady, isInitialized, isLoading]);
 
-  if (!appIsReady) {
+  if (!appIsReady || !isInitialized || isLoading) {
     return null;
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1}} onLayout={onLayoutRootView}>
+    <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <SafeAreaProvider>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(onboarding)" />
